@@ -186,7 +186,7 @@ class Cascade:
             config=self.config,
             tool_registry=self.tool_registry,
             escalation_policy=self.escalation_policy,
-            allowed_tools=["all"],
+            allowed_tools=[],
             provider_factory=self._get_provider,
             max_iterations=60,  # Root agent has higher iterations allowance
             cost_callback=self._track_cost,
@@ -196,7 +196,7 @@ class Cascade:
             id=str(uuid.uuid4())[:8],
             description=task_description,
             assigned_model=root_model_id,
-            assigned_tools=["all"],
+            assigned_tools=["all"],  # It can assigned all tools to its children
         )
         
         # We can map the legacy `on_tier_start` callback to when agents spawn

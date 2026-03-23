@@ -63,15 +63,21 @@ def print_agent_header(model_id: str, subtask_desc: str) -> None:
 
 def print_tool_call(tool_name: str, args: dict[str, Any]) -> None:
     """Display a tool call."""
+    
+    # Hide massive prompt payload for delegate_task so terminal remains clean
+    display_args = args.copy()
+    if tool_name == "delegate_task" and "description" in display_args:
+        display_args["description"] = "<hidden to preserve console readability>"
+        
     # Format arguments as compact JSON syntax highlighting
     try:
-        args_json = json.dumps(args, indent=2)
+        args_json = json.dumps(display_args, indent=2)
     except TypeError:
-        args_json = str(args)
+        args_json = str(display_args)
     
     # If it's a massive arg (like writing a whole file), truncate visual
-    if len(args_json) > 800:
-        args_json = args_json[:800] + "\n... (truncated visual)"
+    if len(args_json) > 1000:
+        args_json = args_json[:1000] + "\n... (truncated visual)"
         
     syntax = Syntax(args_json, "json", theme="monokai", padding=0, word_wrap=True)
     

@@ -23,6 +23,7 @@ DELEGATE_TOOL_SCHEMA = ToolSchema(
     parameters={
         "type": "object",
         "properties": {
+            "title": {"type": "string", "description": "A short, 1-line summary of what this child agent will do (e.g., 'Writing tests for utils.py')."},
             "description": {"type": "string", "description": "Clear instructions for the child agent"},
             "model_id": {"type": "string", "description": "Which model to assign (e.g., 'worker', 'local')"},
             "tools": {
@@ -31,7 +32,7 @@ DELEGATE_TOOL_SCHEMA = ToolSchema(
                 "description": "List of tool names to grant. Pass ['all'] to grant all your tools."
             }
         },
-        "required": ["description", "model_id", "tools"]
+        "required": ["title", "description", "model_id", "tools"]
     }
 )
 
@@ -39,7 +40,7 @@ AGENT_SYSTEM_PROMPT = """You are a Cascade AI Agent ({model_id}).
 
 Your role is to complete the assigned task using the tools provided.
 If the task is simple and you have the right tools, execute it directly.
-If the task is highly complex, breaks down into many distinct parts, or requires capabilities you don't have, you can use the `delegate_task` tool to spawn child agents to help you.
+If the task is highly complex, breaks down into many distinct parts, or requires capabilities you don't have, you MUST use the `delegate_task` tool to spawn child agents to help you.
 
 Available Models for Delegation:
 {models_list}
@@ -49,7 +50,7 @@ CRITICAL Guidelines:
 2. **Be targeted with reads**: Only read files that are directly relevant to the task. Do NOT read every file in a directory. If the task is to create something new, you may not need to read anything at all.
 3. **Reading ≠ Completion**: Reading an existing file is a step, NOT the end goal. After gathering information, you MUST proceed to actually complete the task (e.g., create, edit, or run something). Never stop just because you read a file.
 4. **Create even if files exist**: When asked to create a new file or project, the presence of other files in the directory does NOT mean the task is done. Proceed to create the requested content.
-5. **Delegate wisely**: Only delegate if the task is truly complex or outside your tool scope.
+5. **Delegate wisely**: If you have no tools other than `delegate_task`, you MUST act purely as an orchestrator and delegate all work to child agents. You may pass `["all"]` to grant them full capabilities.
 6. **Always provide a detailed summary**: When finished, provide a clear, detailed summary of exactly what you accomplished — list files created, changes made, commands run, etc. Never respond with just "done" or an empty message.
 7. **Verify your work**: After editing code, read back edited files to confirm correctness.
 """
@@ -82,7 +83,15 @@ class CascadeAgent:
     def _get_system_prompt(self) -> str:
         models_info = []
         for m in self.config.models:
-            models_info.append(f"- {m.id} ({m.provider}/{m.model})")
+            desc = ""
+            if "planner" in m.id.lower() or "t1" in m.id.lower():
+                desc = " - Use for complex architectural decisions and task decomposition."
+            elif "worker" in m.id.lower() or "t2" in m.id.lower():
+                desc = " - Use for standard coding tasks, file edits, and tool-heavy subtasks."
+            elif "local" in m.id.lower() or "t3" in m.id.lower() or m.provider == "ollama":
+                desc = " - Use for simple, well-defined tasks (reading files, searching code, basic formatting) to save costs and distribute workload."
+                
+            models_info.append(f"- {m.id} ({m.provider}/{m.model}){desc}")
         
         return AGENT_SYSTEM_PROMPT.format(
             model_id=self.model_id,
@@ -165,7 +174,7 @@ class CascadeAgent:
                         await on_agent_spawn(
                             self.model_id, 
                             tc.arguments.get("model_id", "unknown"),
-                            tc.arguments.get("description", "")
+                            tc.arguments.get("title", tc.arguments.get("description", ""))
                         )
                         
                     child_result_str, child_success = await self._handle_delegation(
