@@ -37,6 +37,7 @@ def run(
         None, "--budget", "-b", help="Max session cost in dollars"
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+    no_auditor: bool = typer.Option(False, "--no-auditor", help="Disable the Sentinel Auditor safety checks"),
 ) -> None:
     """Execute a task using the Cascade fractal agent system."""
     from cascade.api import Cascade
@@ -259,6 +260,7 @@ def chat(
         None, "--budget", "-b", help="Max session cost in dollars"
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+    no_auditor: bool = typer.Option(False, "--no-auditor", help="Disable the Sentinel Auditor safety checks"),
 ) -> None:
     """Start an interactive chat session with Cascade."""
     from cascade.api import Cascade
@@ -282,6 +284,8 @@ def chat(
     cfg = load_config(config)
     if verbose:
         cfg.verbose = True
+    if no_auditor:
+        cfg.auditor_enabled = False
     if budget is not None:
         cfg.budget.enabled = True
         cfg.budget.session_max_cost = budget

@@ -79,6 +79,7 @@ class CascadeConfig(BaseModel):
     )
     default_planner: str = "planner"
     default_auditor: Optional[str] = None
+    auditor_enabled: bool = True
     
     api_keys: APIKeysConfig = Field(default_factory=APIKeysConfig)
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)

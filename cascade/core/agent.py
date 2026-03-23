@@ -44,11 +44,14 @@ If the task is highly complex, breaks down into many distinct parts, or requires
 Available Models for Delegation:
 {models_list}
 
-Important Guidelines:
-- Execute what you can; delegate what is complex or outside your tool scope.
-- Wait for tool results (including `delegate_task`) before proceeding.
-- When you are completely finished, provide a concise summary of what was accomplished without making any tool calls.
-- Always verify your work when editing code.
+CRITICAL Guidelines:
+1. **Think before acting**: Before calling ANY tool, first analyze the task and decide what specific steps you need to take. Do NOT immediately start reading files or listing directories — only use tools that are directly needed for the task.
+2. **Be targeted with reads**: Only read files that are directly relevant to the task. Do NOT read every file in a directory. If the task is to create something new, you may not need to read anything at all.
+3. **Reading ≠ Completion**: Reading an existing file is a step, NOT the end goal. After gathering information, you MUST proceed to actually complete the task (e.g., create, edit, or run something). Never stop just because you read a file.
+4. **Create even if files exist**: When asked to create a new file or project, the presence of other files in the directory does NOT mean the task is done. Proceed to create the requested content.
+5. **Delegate wisely**: Only delegate if the task is truly complex or outside your tool scope.
+6. **Always provide a detailed summary**: When finished, provide a clear, detailed summary of exactly what you accomplished — list files created, changes made, commands run, etc. Never respond with just "done" or an empty message.
+7. **Verify your work**: After editing code, read back edited files to confirm correctness.
 """
 
 class CascadeAgent:
@@ -136,7 +139,10 @@ class CascadeAgent:
             if not response.tool_calls:
                 if on_thinking and response.content:
                     await on_thinking(response.content)
-                return True, response.content or "Completed with no output.", confidence
+                final_content = response.content
+                if not final_content or final_content.strip() == "":
+                    final_content = "Task processing completed. The agent finished without producing a detailed summary."
+                return True, final_content, confidence
 
             messages.append(
                 Message(
@@ -190,9 +196,9 @@ class CascadeAgent:
                     )
                     continue
 
-                # Auditor Intervention Check
+                # Auditor Intervention Check (can be disabled via config)
                 if tc.name in ["run_command", "write_file", "edit_file", "git_commit"]:
-                    if self.config.default_auditor:
+                    if self.config.auditor_enabled and self.config.default_auditor:
                         from cascade.core.auditor import AuditorAgent
                         try:
                             aud_provider = self.provider_factory(self.config.default_auditor)

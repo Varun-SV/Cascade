@@ -163,10 +163,16 @@ def print_auditor_block(tool_name: str, reason: str) -> None:
 def print_result(success: bool, summary: str) -> None:
     """Display the final result."""
     console.print()
+    
+    # Clean up empty or overly generic summaries
+    display_summary = summary.strip() if summary else ""
+    if not display_summary:
+        display_summary = "Task completed. No detailed summary was provided by the agent."
+    
     if success:
         console.print(
             Panel(
-                Markdown(summary),
+                Markdown(display_summary),
                 title="✨ [bold green]Task Completed Successfully[/bold green] ✨",
                 border_style="green",
                 box=box.DOUBLE,
@@ -176,7 +182,7 @@ def print_result(success: bool, summary: str) -> None:
     else:
         console.print(
             Panel(
-                Markdown(summary),
+                Markdown(display_summary),
                 title="💥 [bold red]Task Failed[/bold red] 💥",
                 border_style="red",
                 box=box.DOUBLE,
