@@ -266,12 +266,27 @@ class Cascade:
             )
 
             if success:
-                subtask.mark_completed(result_text)
-            elif subtask.status == TaskStatus.ESCALATED:
-                # Already handled by _execute_subtask — if it still failed after
-                # escalation, mark as failed so dependents can see
-                if not success:
-                    subtask.mark_failed(result_text)
+                # ── Validate output using T1 ────────────────────────
+                is_valid, feedback = await self._validate_subtask(
+                    subtask, result_text, orchestrator
+                )
+                if is_valid:
+                    subtask.mark_completed(result_text)
+                else:
+                    logger.warning(f"Validation failed for {subtask.id}: {feedback}")
+                    # Retry once with validation feedback
+                    subtask.status = TaskStatus.IN_PROGRESS
+                    retry_success, retry_result, retry_conf = await self._execute_subtask(
+                        subtask, worker, executor, orchestrator,
+                        extra_context=dep_context + f"\n\nPrevious attempt feedback: {feedback}",
+                    )
+                    if retry_success:
+                        subtask.mark_completed(retry_result)
+                        result_text = retry_result
+                        confidence = retry_conf
+                    else:
+                        subtask.mark_failed(f"Validation failed: {feedback}")
+                        result_text = f"Validation failed: {feedback}"
             else:
                 subtask.mark_failed(result_text)
 
@@ -444,3 +459,51 @@ class Cascade:
                 models[tier_name] = [f"Error: {e}"]
 
         return models
+
+    async def _validate_subtask(
+        self,
+        subtask: SubTask,
+        result: str,
+        orchestrator: Orchestrator,
+    ) -> tuple[bool, str]:
+        """Use T1 to validate a subtask's output quality.
+
+        Returns (is_valid, feedback).
+        """
+        from cascade.providers.base import Message, Role
+
+        validation_prompt = (
+            "You are a quality validator. Evaluate whether this subtask result "
+            "adequately addresses the task description.\n\n"
+            f"## Task Description\n{subtask.description}\n\n"
+            f"## Result\n{result[:3000]}\n\n"
+            "Respond with a JSON object:\n"
+            '{"valid": true/false, "feedback": "reason if invalid"}'
+        )
+
+        try:
+            provider = self._get_provider("t1")
+            response = await provider.generate(
+                messages=[
+                    Message(role=Role.SYSTEM, content="You are a strict output quality validator."),
+                    Message(role=Role.USER, content=validation_prompt),
+                ],
+                temperature=0.1,
+                max_tokens=256,
+            )
+            self._track_cost("t1", provider.get_cost(response.usage))
+
+            import json
+            try:
+                json_str = orchestrator._extract_json(response.content)
+                data = json.loads(json_str)
+                is_valid = data.get("valid", True)
+                feedback = data.get("feedback", "")
+                return is_valid, feedback
+            except (json.JSONDecodeError, TypeError):
+                # If we can't parse the validation response, assume valid
+                return True, ""
+        except Exception as e:
+            logger.warning(f"Validation call failed: {e}")
+            # On validation error, don't block — assume valid
+            return True, ""

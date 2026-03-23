@@ -150,21 +150,43 @@ class OpenAIProvider(BaseProvider):
         temperature: float = 0.2,
         max_tokens: int = 4096,
     ) -> Response:
-        """Generate a completion using OpenAI."""
+        """Generate a completion using OpenAI.
+        
+        Auto-detects whether the model needs max_tokens or max_completion_tokens,
+        retrying with the fallback parameter on 400 errors.
+        """
         if not self.client:
             raise RuntimeError("OpenAI API key not configured")
 
         api_messages = self._format_messages(messages)
-
-        kwargs: dict[str, Any] = {
+        base_kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": api_messages,
-            **self._build_token_params(temperature, max_tokens),
         }
         if tools:
-            kwargs["tools"] = self._format_tools(tools)
+            base_kwargs["tools"] = self._format_tools(tools)
 
-        raw = await self.client.chat.completions.create(**kwargs)
+        # Build parameters — try preferred first, fallback on error
+        token_params = self._build_token_params(temperature, max_tokens)
+
+        try:
+            raw = await self.client.chat.completions.create(**base_kwargs, **token_params)
+        except openai.BadRequestError as e:
+            error_msg = str(e).lower()
+            if "max_tokens" in error_msg or "max_completion_tokens" in error_msg or "unsupported_parameter" in error_msg:
+                # Swap between max_tokens and max_completion_tokens
+                fallback_params: dict[str, Any] = {}
+                if "max_completion_tokens" in token_params:
+                    fallback_params["max_tokens"] = token_params.pop("max_completion_tokens")
+                elif "max_tokens" in token_params:
+                    fallback_params["max_completion_tokens"] = token_params.pop("max_tokens")
+                # Keep temperature if present
+                if "temperature" in token_params:
+                    fallback_params["temperature"] = token_params["temperature"]
+                raw = await self.client.chat.completions.create(**base_kwargs, **fallback_params)
+            else:
+                raise
+
         response = self._parse_response(raw)
         self._last_usage = response.usage
         return response
@@ -181,18 +203,32 @@ class OpenAIProvider(BaseProvider):
             raise RuntimeError("OpenAI API key not configured")
 
         api_messages = self._format_messages(messages)
-
-        kwargs: dict[str, Any] = {
+        base_kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": api_messages,
-            **self._build_token_params(temperature, max_tokens),
             "stream": True,
             "stream_options": {"include_usage": True},
         }
         if tools:
-            kwargs["tools"] = self._format_tools(tools)
+            base_kwargs["tools"] = self._format_tools(tools)
 
-        stream = await self.client.chat.completions.create(**kwargs)
+        token_params = self._build_token_params(temperature, max_tokens)
+
+        try:
+            stream = await self.client.chat.completions.create(**base_kwargs, **token_params)
+        except openai.BadRequestError as e:
+            error_msg = str(e).lower()
+            if "max_tokens" in error_msg or "max_completion_tokens" in error_msg or "unsupported_parameter" in error_msg:
+                fallback_params: dict[str, Any] = {}
+                if "max_completion_tokens" in token_params:
+                    fallback_params["max_tokens"] = token_params.pop("max_completion_tokens")
+                elif "max_tokens" in token_params:
+                    fallback_params["max_completion_tokens"] = token_params.pop("max_tokens")
+                if "temperature" in token_params:
+                    fallback_params["temperature"] = token_params["temperature"]
+                stream = await self.client.chat.completions.create(**base_kwargs, **fallback_params)
+            else:
+                raise
         async for chunk in stream:
             if not chunk.choices:
                 # Final chunk with usage data

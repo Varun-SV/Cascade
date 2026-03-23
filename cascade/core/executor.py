@@ -164,7 +164,10 @@ class Executor:
                 subtask.mark_escalated(reason)
                 return False, reason, confidence
 
-        # Exceeded max iterations — escalate to higher tier
-        reason = f"Exceeded max iterations ({self.max_iterations})"
+        # If we broke due to errors, report the actual error
+        if errors:
+            reason = f"SLM errors: {'; '.join(errors[-3:])}"
+        else:
+            reason = f"Exceeded max iterations ({self.max_iterations})"
         subtask.mark_escalated(reason)
         return False, reason, confidence
