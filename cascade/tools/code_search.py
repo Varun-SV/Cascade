@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from cascade.tools.base import BaseTool, Tier, ToolResult
+from cascade.tools.base import BaseTool, ToolResult
 
 
 class GrepSearchTool(BaseTool):
@@ -41,7 +41,7 @@ class GrepSearchTool(BaseTool):
         },
         "required": ["query"],
     }
-    allowed_tiers = {Tier.T1, Tier.T2, Tier.T3}
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root).resolve()
@@ -155,7 +155,7 @@ class FindFilesTool(BaseTool):
         },
         "required": ["pattern"],
     }
-    allowed_tiers = {Tier.T1, Tier.T2, Tier.T3}
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root).resolve()

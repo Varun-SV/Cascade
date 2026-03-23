@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
+
+# Suppress unclosed transport warnings from asyncio/httpx
+warnings.filterwarnings("ignore", category=ResourceWarning)
 from pathlib import Path
 from typing import Optional
 
@@ -13,7 +17,7 @@ from cascade import __version__
 
 app = typer.Typer(
     name="cascade",
-    help="🌊 Cascade — Multi-Tier AI Agent Orchestration System",
+    help="🌊 Cascade — Dynamic Fractal AI Agent System",
     add_completion=False,
     pretty_exceptions_show_locals=False,
 )
@@ -32,24 +36,22 @@ def run(
     budget: Optional[float] = typer.Option(
         None, "--budget", "-b", help="Max session cost in dollars"
     ),
-    tier: Optional[str] = typer.Option(
-        None, "--tier", "-t", help="Force a specific tier (t1, t2, t3)"
-    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ) -> None:
-    """Execute a task using the Cascade multi-tier agent system."""
+    """Execute a task using the Cascade fractal agent system."""
     from cascade.api import Cascade
     from cascade.config import load_config
     from cascade.utils.display import (
         print_banner,
         print_cost_summary,
         print_escalation,
-        print_plan,
         print_result,
         print_task_start,
-        print_tier_header,
+        print_agent_header,
         print_thinking,
         print_tool_call,
+        print_tool_result,
+        print_auditor_block,
     )
 
     print_banner()
@@ -70,20 +72,8 @@ def run(
     )
 
     # Wire up display callbacks
-    async def on_plan(plan):
-        subtask_dicts = [
-            {
-                "description": st.description,
-                "assigned_tier": st.assigned_tier.value,
-                "status": st.status.value,
-                "dependencies": st.dependencies,
-            }
-            for st in plan.subtasks
-        ]
-        print_plan(subtask_dicts)
-
-    async def on_tier_start(tier_name, desc):
-        print_tier_header(tier_name, desc)
+    async def on_agent_spawn(model_id, desc):
+        print_agent_header(model_id, desc)
 
     async def on_tool_call_cb(name, args):
         print_tool_call(name, args)
@@ -94,11 +84,18 @@ def run(
     async def on_escalation_cb(from_t, to_t, reason):
         print_escalation(from_t, to_t, reason)
 
-    agent.on_plan = on_plan
-    agent.on_tier_start = on_tier_start
+    async def on_auditor_block_cb(tool_name, reason):
+        print_auditor_block(tool_name, reason)
+
+    async def on_tool_result_cb(name, success, output):
+        print_tool_result(success, output)
+
+    agent.on_tier_start = on_agent_spawn
     agent.on_tool_call = on_tool_call_cb
+    agent.on_tool_result = on_tool_result_cb
     agent.on_thinking = on_thinking_cb
     agent.on_escalation = on_escalation_cb
+    agent.on_auditor_block = on_auditor_block_cb
 
     # Execute
     try:
@@ -122,7 +119,7 @@ def models(
         None, "--config", "-c", help="Path to config YAML file"
     ),
 ) -> None:
-    """List available models for each configured provider."""
+    """List available models in the pool."""
     from cascade.api import Cascade
     from cascade.config import load_config
 
@@ -137,11 +134,11 @@ def models(
     from rich.table import Table
 
     table = Table(title="🤖 Available Models", show_header=True)
-    table.add_column("Tier / Provider", style="bold")
-    table.add_column("Models")
+    table.add_column("Model Pool / Provider", style="bold")
+    table.add_column("Available Models Endpoint")
 
-    for tier_info, model_list in all_models.items():
-        table.add_row(tier_info, ", ".join(model_list))
+    for model_info, model_list in all_models.items():
+        table.add_row(model_info, ", ".join(model_list))
 
     console.print(table)
 
@@ -163,20 +160,19 @@ def config_info(
     table.add_column("Setting", style="bold")
     table.add_column("Value")
 
-    table.add_row("T1 Orchestrator", f"{cfg.tiers.t1_orchestrator.provider} / {cfg.tiers.t1_orchestrator.model}")
-    table.add_row("T2 Worker", f"{cfg.tiers.t2_worker.provider} / {cfg.tiers.t2_worker.model}")
-    table.add_row("T3 Executor", f"{cfg.tiers.t3_executor.provider} / {cfg.tiers.t3_executor.model}")
+    table.add_row("Default Planner", cfg.default_planner)
+    
+    for m in cfg.models:
+        table.add_row(f"Model: {m.id}", f"{m.provider} / {m.model}")
+        
     table.add_row("Project Root", cfg.project_root)
     table.add_row("Budget Enabled", str(cfg.budget.enabled))
     if cfg.budget.enabled:
         table.add_row("Session Budget", f"${cfg.budget.session_max_cost}" if cfg.budget.session_max_cost else "unlimited")
+    
     table.add_row(
-        "Escalation T3→T2",
-        f"confidence < {cfg.escalation.t3_confidence_threshold}",
-    )
-    table.add_row(
-        "Escalation T2→T1",
-        f"confidence < {cfg.escalation.t2_confidence_threshold}",
+        "Escalation Confidence",
+        f"< {cfg.escalation.confidence_threshold}",
     )
 
     console.print(table)
@@ -209,11 +205,19 @@ def version() -> None:
 @app.command()
 def init(
     path: str = typer.Argument(".", help="Directory to initialize"),
+    global_config: bool = typer.Option(False, "--global", "-g", help="Initialize global config in ~/.cascade/config.yaml"),
 ) -> None:
-    """Initialize a cascade.yaml config file in the given directory."""
+    """Initialize a cascade.yaml config file."""
     import shutil
+    import os
 
-    target = Path(path) / "cascade.yaml"
+    if global_config:
+        cascade_dir = Path.home() / ".cascade"
+        cascade_dir.mkdir(parents=True, exist_ok=True)
+        target = cascade_dir / "config.yaml"
+    else:
+        target = Path(path) / "cascade.yaml"
+
     if target.exists():
         console.print(f"[yellow]Config already exists: {target}[/yellow]")
         raise typer.Exit(1)
@@ -225,14 +229,15 @@ def init(
         target.write_text(
             "# Cascade Configuration\n"
             "# See https://github.com/varunsv/cascade-ai for full options\n\n"
-            "tiers:\n"
-            "  t1_orchestrator:\n"
+            "default_planner: planner\n"
+            "models:\n"
+            "  - id: planner\n"
             "    provider: anthropic\n"
             "    model: claude-sonnet-4-20250514\n"
-            "  t2_worker:\n"
+            "  - id: worker\n"
             "    provider: anthropic\n"
             "    model: claude-sonnet-4-20250514\n"
-            "  t3_executor:\n"
+            "  - id: local\n"
             "    provider: ollama\n"
             "    model: qwen2.5-coder:7b\n"
         )
@@ -241,6 +246,103 @@ def init(
 
     console.print(f"[green]✓ Created {target}[/green]")
     console.print("Edit it with your API keys and model preferences.")
+
+@app.command()
+def chat(
+    config: Optional[str] = typer.Option(
+        None, "--config", "-c", help="Path to config YAML file"
+    ),
+    project_root: Optional[str] = typer.Option(
+        None, "--root", "-r", help="Project root directory"
+    ),
+    budget: Optional[float] = typer.Option(
+        None, "--budget", "-b", help="Max session cost in dollars"
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+) -> None:
+    """Start an interactive chat session with Cascade."""
+    from cascade.api import Cascade
+    from cascade.config import load_config
+    from rich.prompt import Prompt
+    from cascade.utils.display import (
+        print_banner,
+        print_cost_summary,
+        print_escalation,
+        print_result,
+        print_agent_header,
+        print_thinking,
+        print_tool_call,
+        print_tool_result,
+        print_auditor_block,
+    )
+
+    print_banner()
+    console.print("[bold green]Starting interactive chat mode. Type 'exit' or 'quit' to end.[/bold green]\n")
+
+    cfg = load_config(config)
+    if verbose:
+        cfg.verbose = True
+    if budget is not None:
+        cfg.budget.enabled = True
+        cfg.budget.session_max_cost = budget
+
+    agent = Cascade(
+        config=cfg,
+        project_root=project_root or ".",
+    )
+
+    # Wire up display callbacks
+    async def on_agent_spawn(model_id, desc):
+        print_agent_header(model_id, desc)
+
+    async def on_tool_call_cb(name, args):
+        print_tool_call(name, args)
+
+    async def on_thinking_cb(text):
+        print_thinking(text)
+
+    async def on_escalation_cb(from_t, to_t, reason):
+        print_escalation(from_t, to_t, reason)
+
+    async def on_auditor_block_cb(tool_name, reason):
+        print_auditor_block(tool_name, reason)
+
+    async def on_tool_result_cb(name, success, output):
+        print_tool_result(success, output)
+
+    agent.on_tier_start = on_agent_spawn
+    agent.on_tool_call = on_tool_call_cb
+    agent.on_tool_result = on_tool_result_cb
+    agent.on_thinking = on_thinking_cb
+    agent.on_escalation = on_escalation_cb
+    agent.on_auditor_block = on_auditor_block_cb
+
+    chat_history = ""
+    while True:
+        try:
+            task = Prompt.ask("[bold blue]You[/bold blue]")
+            if task.lower() in ("exit", "quit"):
+                break
+            if not task.strip():
+                continue
+
+            full_task = f"Context from previous turns:\n{chat_history}\n\nCurrent Request:\n{task}" if chat_history else task
+            result = asyncio.run(agent.run_async(full_task))
+            
+            console.print()
+            print_result(result.success, result.summary)
+            print_cost_summary(agent.cost_tracker.get_summary())
+            
+            # Simple summarization for context memory
+            short_res = result.summary[:500] + "..." if len(result.summary) > 500 else result.summary
+            chat_history += f"User: {task}\nCascade: {short_res}\n\n"
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Stopping current task.[/yellow]")
+            continue
+        except EOFError:
+            break
+        except Exception as e:
+             console.print(f"\n[bold red]Error:[/bold red] {e}")
 
 
 if __name__ == "__main__":

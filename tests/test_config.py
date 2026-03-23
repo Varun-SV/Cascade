@@ -14,29 +14,28 @@ class TestCascadeConfig:
     """Test configuration loading and defaults."""
 
     def test_default_config(self):
-        """Defaults should produce a valid config."""
+        """Defaults should produce a valid config with models list."""
         config = CascadeConfig()
-        assert config.tiers.t1_orchestrator.provider == "anthropic"
-        assert config.tiers.t2_worker.provider == "anthropic"
-        assert config.tiers.t3_executor.provider == "ollama"
-        assert config.escalation.t3_confidence_threshold == 0.6
+        assert config.default_planner == "planner"
+        assert len(config.models) == 3
+        planner = config.get_model("planner")
+        assert planner.provider == "anthropic"
+        assert config.escalation.confidence_threshold == 0.5
         assert config.budget.enabled is False
 
     def test_load_from_yaml(self, tmp_path):
         """Should load config from a YAML file."""
         config_data = {
-            "tiers": {
-                "t1_orchestrator": {
+            "default_planner": "worker",
+            "models": [
+                {
+                    "id": "worker",
                     "provider": "openai",
                     "model": "gpt-4o",
-                },
-                "t2_worker": {
-                    "provider": "openai",
-                    "model": "gpt-4o-mini",
-                },
-            },
+                }
+            ],
             "escalation": {
-                "t3_confidence_threshold": 0.7,
+                "confidence_threshold": 0.7,
             },
             "budget": {
                 "enabled": True,
@@ -48,9 +47,11 @@ class TestCascadeConfig:
         config_file.write_text(yaml.dump(config_data))
 
         config = load_config(str(config_file))
-        assert config.tiers.t1_orchestrator.provider == "openai"
-        assert config.tiers.t1_orchestrator.model == "gpt-4o"
-        assert config.escalation.t3_confidence_threshold == 0.7
+        assert config.default_planner == "worker"
+        worker = config.get_model("worker")
+        assert worker.provider == "openai"
+        assert worker.model == "gpt-4o"
+        assert config.escalation.confidence_threshold == 0.7
         assert config.budget.enabled is True
         assert config.budget.session_max_cost == 1.00
 
@@ -63,12 +64,10 @@ class TestCascadeConfig:
     def test_missing_config_uses_defaults(self):
         """Should return defaults when no config file exists."""
         config = load_config("/nonexistent/path.yaml")
-        assert config.tiers.t1_orchestrator.provider == "anthropic"
+        assert config.default_planner == "planner"
 
-    def test_tool_permissions_defaults(self):
-        """Default tool permissions should be set."""
+    def test_missing_model_raises_error(self):
+        """Looking up a nonexistent model should raise ValueError."""
         config = CascadeConfig()
-        assert "read_file" in config.tools.t3_allowed
-        assert "run_command" not in config.tools.t3_allowed
-        assert "run_command" in config.tools.t2_allowed
-        assert config.tools.t1_allowed == "all"
+        with pytest.raises(ValueError, match="not found"):
+            config.get_model("nonexistent_model_id")

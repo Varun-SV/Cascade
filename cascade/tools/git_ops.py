@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from cascade.tools.base import BaseTool, Tier, ToolResult
+from cascade.tools.base import BaseTool, ToolResult
 
 
 class GitStatusTool(BaseTool):
@@ -18,7 +18,7 @@ class GitStatusTool(BaseTool):
         "properties": {},
         "required": [],
     }
-    allowed_tiers = {Tier.T1, Tier.T2, Tier.T3}
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = project_root
@@ -84,7 +84,7 @@ class GitDiffTool(BaseTool):
         },
         "required": [],
     }
-    allowed_tiers = {Tier.T1, Tier.T2, Tier.T3}
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = project_root
@@ -136,7 +136,7 @@ class GitLogTool(BaseTool):
         },
         "required": [],
     }
-    allowed_tiers = {Tier.T1, Tier.T2, Tier.T3}
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = project_root
@@ -184,7 +184,7 @@ class GitCommitTool(BaseTool):
         },
         "required": ["message"],
     }
-    allowed_tiers = {Tier.T1, Tier.T2}  # T3 cannot commit
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = project_root

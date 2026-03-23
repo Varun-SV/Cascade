@@ -6,7 +6,7 @@ import asyncio
 import os
 from typing import Any
 
-from cascade.tools.base import BaseTool, Tier, ToolResult
+from cascade.tools.base import BaseTool, ToolResult
 
 
 class RunCommandTool(BaseTool):
@@ -32,7 +32,7 @@ class RunCommandTool(BaseTool):
         },
         "required": ["command"],
     }
-    allowed_tiers = {Tier.T1, Tier.T2}  # T3 cannot run arbitrary commands
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = project_root

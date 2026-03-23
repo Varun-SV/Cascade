@@ -3,20 +3,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from cascade.providers.base import ToolSchema
-
-
-class Tier(str, Enum):
-    """Agent tiers."""
-
-    T1 = "t1"
-    T2 = "t2"
-    T3 = "t3"
 
 
 class ToolResult(BaseModel):
@@ -33,11 +24,6 @@ class BaseTool(ABC):
     name: str = ""
     description: str = ""
     parameters_schema: dict[str, Any] = {}
-    allowed_tiers: set[Tier] = {Tier.T1, Tier.T2, Tier.T3}
-
-    def is_allowed_for(self, tier: Tier) -> bool:
-        """Check if this tool is accessible for a given tier."""
-        return tier in self.allowed_tiers
 
     def to_schema(self) -> ToolSchema:
         """Convert to a ToolSchema for the LLM."""
@@ -67,28 +53,32 @@ class ToolRegistry:
         """Get a tool by name."""
         return self._tools.get(name)
 
-    def get_tools_for_tier(self, tier: Tier) -> list[BaseTool]:
-        """Return all tools accessible to a given tier."""
-        return [t for t in self._tools.values() if t.is_allowed_for(tier)]
+    def get_tools(self, allowed_names: list[str]) -> list[BaseTool]:
+        """Return all tools that match the allowed names. Use ['all'] for everything."""
+        if allowed_names == ["all"]:
+            return list(self._tools.values())
+        return [t for k, t in self._tools.items() if k in allowed_names]
 
-    def get_schemas_for_tier(self, tier: Tier) -> list[ToolSchema]:
-        """Return tool schemas for a given tier."""
-        return [t.to_schema() for t in self.get_tools_for_tier(tier)]
+    def get_schemas(self, allowed_names: list[str]) -> list[ToolSchema]:
+        """Return tool schemas for the allowed tool names."""
+        return [t.to_schema() for t in self.get_tools(allowed_names)]
 
     def list_all(self) -> list[str]:
         """List all registered tool names."""
         return list(self._tools.keys())
 
-    async def execute(self, name: str, tier: Tier, **kwargs: Any) -> ToolResult:
-        """Execute a tool by name, checking tier permissions."""
+    async def execute(self, name: str, allowed_names: list[str], **kwargs: Any) -> ToolResult:
+        """Execute a tool by name, checking if it is in the allowed list."""
         tool = self._tools.get(name)
         if not tool:
             return ToolResult(success=False, error=f"Unknown tool: {name}")
-        if not tool.is_allowed_for(tier):
+            
+        if allowed_names != ["all"] and name not in allowed_names:
             return ToolResult(
                 success=False,
-                error=f"Tool '{name}' is not allowed for tier {tier.value}",
+                error=f"Tool '{name}' is not permitted for this agent. Allowed tools: {', '.join(allowed_names)}",
             )
+            
         try:
             return await tool.execute(**kwargs)
         except Exception as e:

@@ -19,12 +19,7 @@ class TaskStatus(str, Enum):
     ESCALATED = "escalated"
 
 
-class TierAssignment(str, Enum):
-    """Which tier should handle a subtask."""
 
-    T1 = "t1"
-    T2 = "t2"
-    T3 = "t3"
 
 
 class SubTask(BaseModel):
@@ -32,7 +27,8 @@ class SubTask(BaseModel):
 
     id: str = ""
     description: str
-    assigned_tier: TierAssignment = TierAssignment.T2
+    assigned_model: str = ""
+    assigned_tools: list[str] = Field(default_factory=list)
     status: TaskStatus = TaskStatus.PENDING
     dependencies: list[str] = Field(default_factory=list)  # IDs of prerequisite subtasks
     result: str = ""
@@ -109,4 +105,4 @@ class TaskResult(BaseModel):
     details: str = ""
     subtask_results: list[dict[str, Any]] = Field(default_factory=list)
     total_cost: float = 0.0
-    tier_costs: dict[str, float] = Field(default_factory=dict)
+    model_costs: dict[str, float] = Field(default_factory=dict)

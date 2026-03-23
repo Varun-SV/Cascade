@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from cascade.tools.base import Tier, ToolRegistry, ToolResult
+from cascade.tools.base import ToolRegistry, ToolResult
 from cascade.tools.code_search import FindFilesTool, GrepSearchTool
 from cascade.tools.file_ops import (
     EditFileTool,
@@ -109,30 +109,36 @@ class TestToolRegistry:
         registry.register(tool)
         assert registry.get("read_file") is tool
 
-    def test_tier_filtering(self, project_dir):
+    def test_dynamic_filtering(self, project_dir):
         registry = ToolRegistry()
-        registry.register(ReadFileTool(str(project_dir)))  # All tiers
-        registry.register(WriteFileTool(str(project_dir)))  # T1, T2 only
+        registry.register(ReadFileTool(str(project_dir)))
+        registry.register(WriteFileTool(str(project_dir)))
 
-        t3_tools = registry.get_tools_for_tier(Tier.T3)
-        t2_tools = registry.get_tools_for_tier(Tier.T2)
+        # Request specific tools
+        limited_tools = registry.get_tools(["read_file"])
+        limited_names = [t.name for t in limited_tools]
+        assert "read_file" in limited_names
+        assert "write_file" not in limited_names
 
-        t3_names = [t.name for t in t3_tools]
-        t2_names = [t.name for t in t2_tools]
-
-        assert "read_file" in t3_names
-        assert "write_file" not in t3_names
-        assert "read_file" in t2_names
-        assert "write_file" in t2_names
+        # Request all tools
+        all_tools = registry.get_tools(["all"])
+        all_names = [t.name for t in all_tools]
+        assert "read_file" in all_names
+        assert "write_file" in all_names
 
     @pytest.mark.asyncio
     async def test_execute_denied(self, project_dir):
         registry = ToolRegistry()
         registry.register(WriteFileTool(str(project_dir)))
 
-        result = await registry.execute("write_file", Tier.T3, path="test.py", content="x")
+        result = await registry.execute(
+            "write_file", 
+            allowed_names=["read_file"], 
+            path="test.py", 
+            content="x"
+        )
         assert not result.success
-        assert "not allowed" in result.error.lower()
+        assert "not permitted" in result.error.lower()
 
 
 class TestGrepSearchTool:

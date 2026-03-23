@@ -10,9 +10,10 @@ import yaml
 from pydantic import BaseModel, Field
 
 
-class TierConfig(BaseModel):
-    """Configuration for a single model tier."""
+class ModelConfig(BaseModel):
+    """Configuration for a single model in the pool."""
 
+    id: str
     provider: str = "anthropic"
     model: str = "claude-sonnet-4-20250514"
     temperature: float = 0.2
@@ -34,95 +35,65 @@ class OllamaConfig(BaseModel):
 
 
 class EscalationConfig(BaseModel):
-    """Escalation thresholds."""
+    """Escalation thresholds (bubbles up per recursive call)."""
 
-    t3_confidence_threshold: float = 0.6
-    t2_confidence_threshold: float = 0.5
-    max_retries_before_escalation: int = 2
+    confidence_threshold: float = 0.5
+    max_retries: int = 2
 
 
 class BudgetConfig(BaseModel):
     """Optional cost budget configuration."""
 
     enabled: bool = False
-    t1_max_cost: Optional[float] = None
-    t2_max_cost: Optional[float] = None
-    t3_max_cost: Optional[float] = None
     session_max_cost: Optional[float] = None
-
-
-class TiersConfig(BaseModel):
-    """All tier configurations."""
-
-    t1_orchestrator: TierConfig = Field(
-        default_factory=lambda: TierConfig(
-            provider="anthropic",
-            model="claude-sonnet-4-20250514",
-            temperature=0.3,
-            max_tokens=8192,
-        )
-    )
-    t2_worker: TierConfig = Field(
-        default_factory=lambda: TierConfig(
-            provider="anthropic",
-            model="claude-sonnet-4-20250514",
-            temperature=0.2,
-            max_tokens=4096,
-        )
-    )
-    t3_executor: TierConfig = Field(
-        default_factory=lambda: TierConfig(
-            provider="ollama",
-            model="qwen2.5-coder:7b",
-            temperature=0.1,
-            max_tokens=2048,
-        )
-    )
-
-
-class ToolPermissions(BaseModel):
-    """Tool access control per tier."""
-
-    t3_allowed: list[str] = Field(
-        default_factory=lambda: [
-            "read_file",
-            "list_directory",
-            "grep_search",
-            "find_files",
-        ]
-    )
-    t2_allowed: list[str] = Field(
-        default_factory=lambda: [
-            "read_file",
-            "write_file",
-            "edit_file",
-            "list_directory",
-            "run_command",
-            "grep_search",
-            "find_files",
-            "git_status",
-            "git_diff",
-            "git_log",
-            "git_commit",
-            "fetch_url",
-            "web_search",
-        ]
-    )
-    t1_allowed: Any = "all"
+    model_max_cost: dict[str, float] = Field(default_factory=dict)
 
 
 class CascadeConfig(BaseModel):
     """Root configuration for Cascade."""
 
-    tiers: TiersConfig = Field(default_factory=TiersConfig)
+    models: list[ModelConfig] = Field(
+        default_factory=lambda: [
+            ModelConfig(
+                id="planner",
+                provider="anthropic",
+                model="claude-sonnet-4-20250514",
+                temperature=0.3,
+                max_tokens=8192,
+            ),
+            ModelConfig(
+                id="worker",
+                provider="anthropic",
+                model="claude-sonnet-4-20250514",
+                temperature=0.2,
+                max_tokens=4096,
+            ),
+            ModelConfig(
+                id="local",
+                provider="ollama",
+                model="qwen2.5-coder:7b",
+                temperature=0.1,
+                max_tokens=2048,
+            ),
+        ]
+    )
+    default_planner: str = "planner"
+    default_auditor: Optional[str] = None
+    
     api_keys: APIKeysConfig = Field(default_factory=APIKeysConfig)
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
     escalation: EscalationConfig = Field(default_factory=EscalationConfig)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
-    tools: ToolPermissions = Field(default_factory=ToolPermissions)
     project_root: str = "."
     verbose: bool = False
     log_file: Optional[str] = None
+
+    def get_model(self, model_id: str) -> ModelConfig:
+        """Find a model configuration by ID."""
+        for m in self.models:
+            if m.id == model_id:
+                return m
+        raise ValueError(f"Model ID '{model_id}' not found in configuration.")
 
 
 def _resolve_api_key(config_value: str, env_var: str) -> str:

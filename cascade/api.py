@@ -4,24 +4,25 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import warnings
+
+# Suppress unclosed transport warnings from asyncio/httpx
+warnings.filterwarnings("ignore", category=ResourceWarning)
+
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 from cascade.budget.tracker import CostTracker
-from cascade.config import CascadeConfig, TierConfig, load_config
-from cascade.core.escalation import EscalationContext, EscalationPolicy
-from cascade.core.executor import Executor
-from cascade.core.orchestrator import Orchestrator
+from cascade.config import CascadeConfig, ModelConfig, load_config
+from cascade.core.agent import CascadeAgent
+from cascade.core.escalation import EscalationPolicy
 from cascade.core.task import (
     SubTask,
     Task,
-    TaskPlan,
     TaskResult,
     TaskStatus,
-    TierAssignment,
 )
-from cascade.core.worker import Worker
 from cascade.providers.base import BaseProvider
 from cascade.tools.base import ToolRegistry
 from cascade.tools.code_search import FindFilesTool, GrepSearchTool
@@ -39,36 +40,36 @@ from cascade.utils.logger import setup_logger
 logger = logging.getLogger("cascade")
 
 
-def _create_provider(tier_config: TierConfig, config: CascadeConfig) -> BaseProvider:
-    """Factory: create the right provider for a tier config."""
-    provider_name = tier_config.provider.lower()
+def _create_provider(model_config: ModelConfig, config: CascadeConfig) -> BaseProvider:
+    """Factory: create the right provider based on model config."""
+    provider_name = model_config.provider.lower()
 
     if provider_name == "anthropic":
         from cascade.providers.anthropic_provider import AnthropicProvider
 
         return AnthropicProvider(
             api_key=config.api_keys.anthropic,
-            model=tier_config.model,
+            model=model_config.model,
         )
     elif provider_name == "openai":
         from cascade.providers.openai_provider import OpenAIProvider
 
         return OpenAIProvider(
             api_key=config.api_keys.openai,
-            model=tier_config.model,
+            model=model_config.model,
         )
     elif provider_name == "google":
         from cascade.providers.google_provider import GoogleProvider
 
         return GoogleProvider(
             api_key=config.api_keys.google,
-            model=tier_config.model,
+            model=model_config.model,
         )
     elif provider_name == "ollama":
         from cascade.providers.ollama_provider import OllamaProvider
 
         return OllamaProvider(
-            model=tier_config.model,
+            model=model_config.model,
             base_url=config.ollama.base_url,
         )
     else:
@@ -108,13 +109,6 @@ def _create_tool_registry(project_root: str) -> ToolRegistry:
 class Cascade:
     """
     Main entry point for the Cascade multi-tier AI agent system.
-
-    Usage:
-        from cascade import Cascade
-
-        agent = Cascade(config_path="./cascade.yaml")
-        result = agent.run("add error handling to auth.py")
-        print(result.summary)
     """
 
     def __init__(
@@ -150,67 +144,32 @@ class Cascade:
         self._providers: dict[str, BaseProvider] = {}
 
         # Callbacks for display
-        self.on_plan: Optional[Callable] = None
+        self.on_plan: Optional[Callable] = None  # Now optional, since plans are dynamic
         self.on_tier_start: Optional[Callable] = None
         self.on_tool_call: Optional[Callable] = None
         self.on_tool_result: Optional[Callable] = None
         self.on_thinking: Optional[Callable] = None
+        self.on_auditor_block: Optional[Callable] = None
         self.on_escalation: Optional[Callable] = None
         self.on_validation: Optional[Callable] = None
 
-    def _track_cost(self, tier: str, amount: float) -> None:
-        """Callback for tiers to report their costs."""
-        self.cost_tracker.add_cost(tier, amount)
+    def _track_cost(self, model_id: str, amount: float) -> None:
+        """Callback for agents to report their costs."""
+        self.cost_tracker.add_cost(model_id, amount)
 
-    def _get_provider(self, tier: str) -> BaseProvider:
-        """Get or create the provider for a tier."""
-        if tier not in self._providers:
-            tier_config_map = {
-                "t1": self.config.tiers.t1_orchestrator,
-                "t2": self.config.tiers.t2_worker,
-                "t3": self.config.tiers.t3_executor,
-            }
-            tier_config = tier_config_map[tier]
-            self._providers[tier] = _create_provider(tier_config, self.config)
-        return self._providers[tier]
-
-    def _create_orchestrator(self) -> Orchestrator:
-        return Orchestrator(
-            provider=self._get_provider("t1"),
-            tool_registry=self.tool_registry,
-            escalation_policy=self.escalation_policy,
-        )
-
-    def _create_worker(self) -> Worker:
-        return Worker(
-            provider=self._get_provider("t2"),
-            tool_registry=self.tool_registry,
-            escalation_policy=self.escalation_policy,
-            cost_callback=self._track_cost,
-        )
-
-    def _create_executor(self) -> Executor:
-        return Executor(
-            provider=self._get_provider("t3"),
-            tool_registry=self.tool_registry,
-            escalation_policy=self.escalation_policy,
-            cost_callback=self._track_cost,
-        )
+    def _get_provider(self, model_id: str) -> BaseProvider:
+        """Get or create the provider for a model definition."""
+        if model_id not in self._providers:
+            model_config = self.config.get_model(model_id)
+            self._providers[model_id] = _create_provider(model_config, self.config)
+        return self._providers[model_id]
 
     def run(self, task_description: str) -> TaskResult:
-        """
-        Execute a task synchronously.
-
-        Args:
-            task_description: Natural language description of the task.
-
-        Returns:
-            TaskResult with success status, summary, and cost breakdown.
-        """
+        """Execute a task synchronously."""
         return asyncio.run(self.run_async(task_description))
 
     async def run_async(self, task_description: str) -> TaskResult:
-        """Execute a task asynchronously."""
+        """Execute a task asynchronously through Fractal Agent delegation."""
         task = Task(
             id=str(uuid.uuid4())[:8],
             description=task_description,
@@ -218,292 +177,76 @@ class Cascade:
 
         logger.info(f"Starting task: {task_description}")
 
-        # ── Step 1: T1 decomposes the task ──────────────────────────
-        orchestrator = self._create_orchestrator()
-
-        # Gather project context
-        project_context = await self._gather_project_context()
-
-        plan = await orchestrator.decompose_task(task_description, project_context)
-        # Track T1 decomposition cost
-        t1_prov = self._get_provider("t1")
-        if hasattr(t1_prov, '_last_usage') and t1_prov._last_usage:
-            self._track_cost("t1", t1_prov.get_cost(t1_prov._last_usage))
-        task.plan = plan
-
-        if self.on_plan:
-            await self.on_plan(plan)
-
-        logger.info(f"Plan created: {len(plan.subtasks)} subtasks")
-
-        # ── Step 2: Execute subtasks ────────────────────────────────
-        worker = self._create_worker()
-        executor = self._create_executor()
-        subtask_results: list[dict[str, Any]] = []
-
-        while not plan.is_complete():
-            subtask = plan.get_next_subtask()
-            if subtask is None:
-                # All remaining subtasks have unmet dependencies or are done
-                pending = [s for s in plan.subtasks if s.status == TaskStatus.PENDING]
-                if pending:
-                    # Force-fail remaining tasks with unresolvable deps
-                    for s in pending:
-                        s.mark_failed("Unresolvable dependency")
-                break
-
-            subtask.mark_in_progress()
-
-            if self.on_tier_start:
-                await self.on_tier_start(subtask.assigned_tier.value, subtask.description)
-
-            # Build context from completed dependencies
-            dep_context = self._build_subtask_context(subtask, plan)
-
-            # Execute based on assigned tier
-            success, result_text, confidence = await self._execute_subtask(
-                subtask, worker, executor, orchestrator, extra_context=dep_context
-            )
-
-            if success:
-                # ── Validate output using T1 ────────────────────────
-                is_valid, feedback = await self._validate_subtask(
-                    subtask, result_text, orchestrator
-                )
-                if is_valid:
-                    subtask.mark_completed(result_text)
-                else:
-                    logger.warning(f"Validation failed for {subtask.id}: {feedback}")
-                    # Retry once with validation feedback
-                    subtask.status = TaskStatus.IN_PROGRESS
-                    retry_success, retry_result, retry_conf = await self._execute_subtask(
-                        subtask, worker, executor, orchestrator,
-                        extra_context=dep_context + f"\n\nPrevious attempt feedback: {feedback}",
-                    )
-                    if retry_success:
-                        subtask.mark_completed(retry_result)
-                        result_text = retry_result
-                        confidence = retry_conf
-                    else:
-                        subtask.mark_failed(f"Validation failed: {feedback}")
-                        result_text = f"Validation failed: {feedback}"
-            else:
-                subtask.mark_failed(result_text)
-
-            subtask_results.append(
-                {
-                    "id": subtask.id,
-                    "description": subtask.description,
-                    "tier": subtask.assigned_tier.value,
-                    "status": subtask.status.value,
-                    "result": result_text[:500],
-                    "confidence": confidence,
-                }
-            )
-
-        # ── Step 3: Compile results ─────────────────────────────────
-        all_success = all(
-            st.status == TaskStatus.COMPLETED for st in plan.subtasks
+        # Instantiate root agent
+        root_model_id = self.config.default_planner
+        
+        root_agent = CascadeAgent(
+            model_id=root_model_id,
+            provider=self._get_provider(root_model_id),
+            config=self.config,
+            tool_registry=self.tool_registry,
+            escalation_policy=self.escalation_policy,
+            allowed_tools=["all"],
+            provider_factory=self._get_provider,
+            max_iterations=60,  # Root agent has higher iterations allowance
+            cost_callback=self._track_cost,
         )
 
-        summaries = []
-        for st in plan.subtasks:
-            if st.status == TaskStatus.COMPLETED and st.result:
-                summaries.append(st.result)
+        subtask = SubTask(
+            id=str(uuid.uuid4())[:8],
+            description=task_description,
+            assigned_model=root_model_id,
+            assigned_tools=["all"],
+        )
+        
+        # We can map the legacy `on_tier_start` callback to when agents spawn
+        async def handle_agent_spawn(parent_model: str, child_model: str, desc: str):
+            if self.on_tier_start:
+                await self.on_tier_start(child_model, desc)
+
+        if self.on_tier_start:
+            await self.on_tier_start(root_model_id, "Root Agent Planning & Execution")
+
+        success, result_text, confidence = await root_agent.execute_subtask(
+            subtask,
+            context="",
+            on_tool_call=self.on_tool_call,
+            on_thinking=self.on_thinking,
+            on_agent_spawn=handle_agent_spawn,
+            on_auditor_block=self.on_auditor_block,
+            on_tool_result=self.on_tool_result,
+        )
+
+        subtask_results = [
+            {
+                "id": subtask.id,
+                "description": subtask.description,
+                "model": root_model_id,
+                "status": "completed" if success else "failed",
+                "result": result_text[:500],
+                "confidence": confidence,
+            }
+        ]
 
         return TaskResult(
-            success=all_success,
-            summary="\n\n".join(summaries) if summaries else "No results produced.",
-            details=plan.reasoning,
+            success=success,
+            summary=result_text,
+            details=f"Master agent completed execution with confidence {confidence:.2f}",
             subtask_results=subtask_results,
             total_cost=self.cost_tracker.total_cost,
-            tier_costs=dict(self.cost_tracker.costs),
+            model_costs=dict(self.cost_tracker.costs),
         )
-
-    async def _execute_subtask(
-        self,
-        subtask: SubTask,
-        worker: Worker,
-        executor: Executor,
-        orchestrator: Orchestrator,
-        extra_context: str = "",
-    ) -> tuple[bool, str, float]:
-        """Execute a subtask with automatic chained escalation (T3→T2→T1)."""
-        context = extra_context
-
-        # Callbacks for display
-        async def tool_call_cb(name: str, args: dict) -> None:
-            if self.on_tool_call:
-                await self.on_tool_call(name, args)
-
-        async def thinking_cb(text: str) -> None:
-            if self.on_thinking:
-                await self.on_thinking(text)
-
-        # Escalation chain: try current tier, escalate upward as needed
-        tier_order = ["t3", "t2", "t1"]
-        current_tier = subtask.assigned_tier.value
-        start_idx = tier_order.index(current_tier) if current_tier in tier_order else 1
-
-        for tier_idx in range(start_idx, len(tier_order)):
-            current_tier = tier_order[tier_idx]
-
-            if current_tier == "t3":
-                success, result, confidence = await executor.execute_subtask(
-                    subtask, context, on_tool_call=tool_call_cb, on_thinking=thinking_cb
-                )
-            elif current_tier == "t2":
-                success, result, confidence = await worker.execute_subtask(
-                    subtask, context, on_tool_call=tool_call_cb, on_thinking=thinking_cb
-                )
-            else:  # t1 — orchestrator handles directly
-                try:
-                    esc_context = self.escalation_policy.build_context(
-                        from_tier="t2",
-                        reason=result if 'result' in dir() else "Escalated to T1",
-                        task_description=subtask.description,
-                        attempts=subtask.retries,
-                        errors=[subtask.error] if subtask.error else [],
-                    )
-                    guidance = await orchestrator.handle_escalation(esc_context)
-
-                    if guidance.get("action") == "resolve":
-                        return True, guidance.get("resolution", "Resolved by T1"), 0.9
-                    elif guidance.get("action") == "retry":
-                        subtask.status = TaskStatus.IN_PROGRESS
-                        instructions = guidance.get("instructions", "")
-                        if self.on_tier_start:
-                            await self.on_tier_start("t2", f"(retry) {subtask.description}")
-                        success, result, confidence = await worker.execute_with_instructions(
-                            instructions, subtask,
-                            on_tool_call=tool_call_cb, on_thinking=thinking_cb,
-                        )
-                        return success, result, confidence
-                    else:
-                        return False, guidance.get("resolution", "T1 could not resolve"), 0.3
-                except Exception as e:
-                    return False, f"T1 escalation failed: {e}", 0.1
-
-            # If successful, we're done
-            if success:
-                return success, result, confidence
-
-            # If the tier escalated (not just failed), chain to next tier
-            if subtask.status == TaskStatus.ESCALATED:
-                next_tier = tier_order[tier_idx + 1] if tier_idx + 1 < len(tier_order) else None
-                if next_tier:
-                    if self.on_escalation:
-                        await self.on_escalation(current_tier, next_tier, result)
-
-                    # Reset subtask for the next tier
-                    subtask.status = TaskStatus.IN_PROGRESS
-                    subtask.assigned_tier = TierAssignment(next_tier)
-                    context += f"\n\nEscalated from {current_tier.upper()}: {result}"
-
-                    if self.on_tier_start:
-                        await self.on_tier_start(next_tier, subtask.description)
-
-                    continue  # Try next tier
-                else:
-                    # No higher tier to escalate to
-                    return False, result, confidence
-            else:
-                # Failed without escalating — just return failure
-                return False, result, confidence
-
-        return False, result if 'result' in dir() else "All tiers exhausted", 0.1
-
-    def _build_subtask_context(self, subtask: SubTask, plan: TaskPlan) -> str:
-        """Build context from completed dependency results."""
-        if not subtask.dependencies or not plan:
-            return ""
-
-        context_parts: list[str] = []
-        for dep_id in subtask.dependencies:
-            for st in plan.subtasks:
-                if st.id == dep_id and st.status == TaskStatus.COMPLETED and st.result:
-                    context_parts.append(
-                        f"### Result from '{st.description}':\n{st.result[:2000]}"
-                    )
-                    break
-
-        if context_parts:
-            return "## Context from previous subtasks\n\n" + "\n\n".join(context_parts)
-        return ""
-
-    async def _gather_project_context(self) -> str:
-        """Gather basic project context for the orchestrator."""
-        from cascade.tools.base import Tier
-
-        # List project root
-        result = await self.tool_registry.execute(
-            "list_directory",
-            Tier.T1,
-            path=self.project_root,
-            max_depth=2,
-        )
-        context = f"Project directory ({self.project_root}):\n{result.output}"
-        return context
 
     async def list_models(self) -> dict[str, list[str]]:
-        """List available models for each configured provider."""
+        """List available models for each configured provider in the pool."""
         models: dict[str, list[str]] = {}
 
-        for tier_name in ["t1", "t2", "t3"]:
+        for model_cfg in self.config.models:
             try:
-                provider = self._get_provider(tier_name)
-                tier_models = await provider.list_models()
-                provider_name = getattr(provider, "__class__", type(provider)).__name__
-                models[f"{tier_name} ({provider_name})"] = tier_models
+                provider = self._get_provider(model_cfg.id)
+                provider_models = await provider.list_models()
+                models[f"{model_cfg.id} ({model_cfg.provider})"] = provider_models
             except Exception as e:
-                models[tier_name] = [f"Error: {e}"]
+                models[model_cfg.id] = [f"Error: {e}"]
 
         return models
-
-    async def _validate_subtask(
-        self,
-        subtask: SubTask,
-        result: str,
-        orchestrator: Orchestrator,
-    ) -> tuple[bool, str]:
-        """Use T1 to validate a subtask's output quality.
-
-        Returns (is_valid, feedback).
-        """
-        from cascade.providers.base import Message, Role
-
-        validation_prompt = (
-            "You are a quality validator. Evaluate whether this subtask result "
-            "adequately addresses the task description.\n\n"
-            f"## Task Description\n{subtask.description}\n\n"
-            f"## Result\n{result[:3000]}\n\n"
-            "Respond with a JSON object:\n"
-            '{"valid": true/false, "feedback": "reason if invalid"}'
-        )
-
-        try:
-            provider = self._get_provider("t1")
-            response = await provider.generate(
-                messages=[
-                    Message(role=Role.SYSTEM, content="You are a strict output quality validator."),
-                    Message(role=Role.USER, content=validation_prompt),
-                ],
-                temperature=0.1,
-                max_tokens=256,
-            )
-            self._track_cost("t1", provider.get_cost(response.usage))
-
-            import json
-            try:
-                json_str = orchestrator._extract_json(response.content)
-                data = json.loads(json_str)
-                is_valid = data.get("valid", True)
-                feedback = data.get("feedback", "")
-                return is_valid, feedback
-            except (json.JSONDecodeError, TypeError):
-                # If we can't parse the validation response, assume valid
-                return True, ""
-        except Exception as e:
-            logger.warning(f"Validation call failed: {e}")
-            # On validation error, don't block — assume valid
-            return True, ""

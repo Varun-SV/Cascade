@@ -173,16 +173,20 @@ class OpenAIProvider(BaseProvider):
             raw = await self.client.chat.completions.create(**base_kwargs, **token_params)
         except openai.BadRequestError as e:
             error_msg = str(e).lower()
-            if "max_tokens" in error_msg or "max_completion_tokens" in error_msg or "unsupported_parameter" in error_msg:
-                # Swap between max_tokens and max_completion_tokens
-                fallback_params: dict[str, Any] = {}
-                if "max_completion_tokens" in token_params:
-                    fallback_params["max_tokens"] = token_params.pop("max_completion_tokens")
-                elif "max_tokens" in token_params:
-                    fallback_params["max_completion_tokens"] = token_params.pop("max_tokens")
-                # Keep temperature if present
-                if "temperature" in token_params:
-                    fallback_params["temperature"] = token_params["temperature"]
+            if "max_tokens" in error_msg or "max_completion_tokens" in error_msg or "unsupported" in error_msg or "temperature" in error_msg:
+                fallback_params = dict(token_params)
+                
+                if "temperature" in error_msg:
+                    # It's a temperature error, just remove temperature
+                    if "temperature" in fallback_params:
+                        fallback_params.pop("temperature")
+                else:
+                    # It's a token parameter error, swap them
+                    if "max_completion_tokens" in fallback_params:
+                        fallback_params["max_tokens"] = fallback_params.pop("max_completion_tokens")
+                    elif "max_tokens" in fallback_params:
+                        fallback_params["max_completion_tokens"] = fallback_params.pop("max_tokens")
+
                 raw = await self.client.chat.completions.create(**base_kwargs, **fallback_params)
             else:
                 raise
@@ -218,14 +222,20 @@ class OpenAIProvider(BaseProvider):
             stream = await self.client.chat.completions.create(**base_kwargs, **token_params)
         except openai.BadRequestError as e:
             error_msg = str(e).lower()
-            if "max_tokens" in error_msg or "max_completion_tokens" in error_msg or "unsupported_parameter" in error_msg:
-                fallback_params: dict[str, Any] = {}
-                if "max_completion_tokens" in token_params:
-                    fallback_params["max_tokens"] = token_params.pop("max_completion_tokens")
-                elif "max_tokens" in token_params:
-                    fallback_params["max_completion_tokens"] = token_params.pop("max_tokens")
-                if "temperature" in token_params:
-                    fallback_params["temperature"] = token_params["temperature"]
+            if "max_tokens" in error_msg or "max_completion_tokens" in error_msg or "unsupported" in error_msg or "temperature" in error_msg:
+                fallback_params = dict(token_params)
+
+                if "temperature" in error_msg:
+                    # It's a temperature error, just remove temperature
+                    if "temperature" in fallback_params:
+                        fallback_params.pop("temperature")
+                else:
+                    # It's a token parameter error, swap them
+                    if "max_completion_tokens" in fallback_params:
+                        fallback_params["max_tokens"] = fallback_params.pop("max_completion_tokens")
+                    elif "max_tokens" in fallback_params:
+                        fallback_params["max_completion_tokens"] = fallback_params.pop("max_tokens")
+
                 stream = await self.client.chat.completions.create(**base_kwargs, **fallback_params)
             else:
                 raise

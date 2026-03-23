@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from rich.console import Console
@@ -13,18 +14,17 @@ from rich.text import Text
 from rich.tree import Tree
 
 
-# ── Colour scheme ───────────────────────────────────────────────────
-TIER_COLORS = {
-    "t1": "bold magenta",
-    "t2": "bold cyan",
-    "t3": "bold green",
-}
+def get_color_for_model(model_id: str) -> str:
+    """Generate a consistent rich color based on model ID."""
+    # Special defaults for the standard models
+    if model_id == "planner": return "bold magenta"
+    if model_id == "worker": return "bold cyan"
+    if model_id == "local": return "bold green"
 
-TIER_LABELS = {
-    "t1": "🧠 T1 Orchestrator",
-    "t2": "🔧 T2 Worker",
-    "t3": "⚡ T3 Executor",
-}
+    colors = ["magenta", "cyan", "green", "blue", "yellow", "red", "purple"]
+    idx = int(hashlib.md5(model_id.encode()).hexdigest(), 16) % len(colors)
+    return f"bold {colors[idx]}"
+
 
 STATUS_ICONS = {
     "pending": "⏳",
@@ -46,8 +46,8 @@ def print_banner() -> None:
     banner.append("C A S C A D E", style="bold white")
     banner.append("              ║\n", style="bold blue")
     banner.append("║   ", style="bold blue")
-    banner.append("Multi-Tier AI Agent System", style="dim")
-    banner.append("     ║\n", style="bold blue")
+    banner.append("Dynamic Fractal Agent System", style="dim")
+    banner.append("   ║\n", style="bold blue")
     banner.append("╚══════════════════════════════════════╝", style="bold blue")
     console.print(banner)
     console.print()
@@ -65,31 +65,10 @@ def print_task_start(description: str) -> None:
     )
 
 
-def print_plan(subtasks: list[dict[str, Any]]) -> None:
-    """Display the task plan as a tree."""
-    tree = Tree("📋 [bold]Execution Plan[/bold]")
-
-    for st in subtasks:
-        tier = st.get("assigned_tier", "t2")
-        color = TIER_COLORS.get(tier, "white")
-        label = TIER_LABELS.get(tier, tier)
-        status = st.get("status", "pending")
-        icon = STATUS_ICONS.get(status, "⏳")
-
-        branch = tree.add(
-            f"{icon} [{color}]{label}[/{color}]: {st.get('description', '')}"
-        )
-        if st.get("dependencies"):
-            branch.add(f"[dim]depends on: {', '.join(st['dependencies'])}[/dim]")
-
-    console.print(tree)
-    console.print()
-
-
-def print_tier_header(tier: str, subtask_desc: str) -> None:
-    """Print header when a tier starts working."""
-    color = TIER_COLORS.get(tier, "white")
-    label = TIER_LABELS.get(tier, tier)
+def print_agent_header(model_id: str, subtask_desc: str) -> None:
+    """Print header when an agent starts working or is spawned."""
+    color = get_color_for_model(model_id)
+    label = f"🤖 {model_id.upper()}"
     console.print(f"\n[{color}]{'━' * 50}[/{color}]")
     console.print(f"[{color}]{label}[/{color}] → {subtask_desc}")
     console.print(f"[{color}]{'━' * 50}[/{color}]")
@@ -121,16 +100,25 @@ def print_thinking(text: str) -> None:
         console.print(f"  [dim italic]💭 {text[:300]}[/dim italic]")
 
 
-def print_escalation(from_tier: str, to_tier: str, reason: str) -> None:
+def print_escalation(from_model: str, to_model: str, reason: str) -> None:
     """Display an escalation event."""
     console.print(
         Panel(
             f"[yellow]Reason: {reason}[/yellow]",
-            title=f"⬆️  Escalation: {TIER_LABELS.get(from_tier, from_tier)} → {TIER_LABELS.get(to_tier, to_tier)}",
+            title=f"⬆️  Escalation: {from_model} → {to_model}",
             border_style="yellow",
         )
     )
 
+def print_auditor_block(tool_name: str, reason: str) -> None:
+    """Display when the Auditor blocks an action."""
+    console.print(
+        Panel(
+            f"[bold red]Blocked Tool:[/bold red] {tool_name}\n[bold red]Reason:[/bold red] {reason}",
+            title="🛡️ [bold red]Auditor Intervention[/bold red]",
+            border_style="red",
+        )
+    )
 
 def print_result(success: bool, summary: str) -> None:
     """Display the final result."""
@@ -157,12 +145,11 @@ def print_result(success: bool, summary: str) -> None:
 def print_cost_summary(costs: dict[str, str]) -> None:
     """Display cost breakdown."""
     table = Table(title="💰 Cost Summary", show_header=True, border_style="dim")
-    table.add_column("Tier", style="bold")
+    table.add_column("Model", style="bold")
     table.add_column("Cost", justify="right")
 
-    for tier, cost_str in costs.items():
-        color = TIER_COLORS.get(tier, "white")
-        label = TIER_LABELS.get(tier, tier.upper())
-        table.add_row(f"[{color}]{label}[/{color}]", cost_str)
+    for model_id, cost_str in costs.items():
+        color = get_color_for_model(model_id)
+        table.add_row(f"[{color}]{model_id.upper()}[/{color}]", cost_str)
 
     console.print(table)

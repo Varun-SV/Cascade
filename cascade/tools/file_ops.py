@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from cascade.tools.base import BaseTool, Tier, ToolResult
+from cascade.tools.base import BaseTool, ToolResult
 
 
 class ReadFileTool(BaseTool):
@@ -35,7 +35,7 @@ class ReadFileTool(BaseTool):
         },
         "required": ["path"],
     }
-    allowed_tiers = {Tier.T1, Tier.T2, Tier.T3}
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root).resolve()
@@ -101,7 +101,7 @@ class WriteFileTool(BaseTool):
         },
         "required": ["path", "content"],
     }
-    allowed_tiers = {Tier.T1, Tier.T2}
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root).resolve()
@@ -156,7 +156,7 @@ class EditFileTool(BaseTool):
         },
         "required": ["path", "target", "replacement"],
     }
-    allowed_tiers = {Tier.T1, Tier.T2}
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root).resolve()
@@ -221,7 +221,7 @@ class ListDirectoryTool(BaseTool):
         },
         "required": [],
     }
-    allowed_tiers = {Tier.T1, Tier.T2, Tier.T3}
+
 
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root).resolve()

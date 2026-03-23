@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from cascade.tools.base import BaseTool, Tier, ToolResult
+from cascade.tools.base import BaseTool, ToolResult
 
 
 class FetchURLTool(BaseTool):
@@ -27,7 +27,7 @@ class FetchURLTool(BaseTool):
         },
         "required": ["url"],
     }
-    allowed_tiers = {Tier.T1, Tier.T2}
+
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         url = kwargs.get("url", "")
@@ -110,7 +110,7 @@ class WebSearchTool(BaseTool):
         },
         "required": ["query"],
     }
-    allowed_tiers = {Tier.T1, Tier.T2}
+
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         query = kwargs.get("query", "")
@@ -120,7 +120,7 @@ class WebSearchTool(BaseTool):
             return ToolResult(success=False, error="No search query provided")
 
         try:
-            from duckduckgo_search import DDGS
+            from ddgs import DDGS
 
             results: list[str] = []
             with DDGS() as ddgs:
@@ -138,7 +138,7 @@ class WebSearchTool(BaseTool):
         except ImportError:
             return ToolResult(
                 success=False,
-                error="duckduckgo-search not installed. Run: pip install duckduckgo-search",
+                error="ddgs not installed. Run: pip install ddgs",
             )
         except Exception as e:
             return ToolResult(success=False, error=f"Search error: {e}")
