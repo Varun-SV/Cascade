@@ -69,6 +69,20 @@ def print_tool_call(tool_name: str, args: dict[str, Any]) -> None:
     if tool_name == "delegate_task" and "description" in display_args:
         display_args["description"] = "<hidden to preserve console readability>"
         
+    # Special formatting for shell commands
+    if tool_name == "run_command" and "command" in display_args:
+        cmd = display_args["command"]
+        panel = Panel(
+            Text(f"$ {cmd}", style="bold green"),
+            title="🖥️  [bold yellow]Executing Command[/bold yellow]",
+            title_align="left",
+            border_style="yellow",
+            box=box.ROUNDED,
+            padding=(0, 1)
+        )
+        console.print(Padding(panel, (0, 0, 0, 4)))
+        return
+
     # Format arguments as compact JSON syntax highlighting
     try:
         args_json = json.dumps(display_args, indent=2)

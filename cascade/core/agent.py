@@ -29,7 +29,7 @@ DELEGATE_TOOL_SCHEMA = ToolSchema(
             "tools": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "List of tool names to grant. Pass ['all'] to grant all your tools."
+                "description": "List of ONLY the specific tool names needed for the task (e.g., ['read_file', 'list_directory']). Restrict tools to match the child agent's role (e.g., read-only tools for 'local'). Pass ['all'] ONLY if unavoidable."
             }
         },
         "required": ["title", "description", "model_id", "tools"]
@@ -44,6 +44,9 @@ If the task is highly complex, breaks down into many distinct parts, or requires
 
 Available Models for Delegation:
 {models_list}
+
+Available Tools for Delegation (select ONLY what the child needs):
+{tools_list}
 
 CRITICAL Guidelines:
 1. **Think before acting**: Before calling ANY tool, first analyze the task and decide what specific steps you need to take. Do NOT immediately start reading files or listing directories — only use tools that are directly needed for the task.
@@ -92,10 +95,16 @@ class CascadeAgent:
                 desc = " - Use for simple, well-defined tasks (reading files, searching code, basic formatting) to save costs and distribute workload."
                 
             models_info.append(f"- {m.id} ({m.provider}/{m.model}){desc}")
+            
+        tools_info = []
+        for name, tool in self.tool_registry._tools.items():
+            if name != "delegate_task":
+                tools_info.append(f"- {name}: {tool.description}")
         
         return AGENT_SYSTEM_PROMPT.format(
             model_id=self.model_id,
             models_list="\n".join(models_info),
+            tools_list="\n".join(tools_info),
         )
 
     async def execute_subtask(
@@ -310,15 +319,11 @@ class CascadeAgent:
         except Exception as e:
             return f"Error initializing child provider: {e}", False
 
-        # If child requested 'all' but parent doesn't have 'all', restrict it
+        # Grant the requested tools, expanding 'all' to the full registry
         if tools == ["all"]:
-            child_tools = self.allowed_tools
+            child_tools = ["all"]
         else:
-            # Only grant tools the parent itself holds
-            if self.allowed_tools == ["all"]:
-                child_tools = tools
-            else:
-                child_tools = [t for t in tools if t in self.allowed_tools]
+            child_tools = tools
                 
         child_task = SubTask(
             description=desc,
