@@ -1,273 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cascade AI — Multi-Tier Agent Orchestration</title>
   <meta name="description" content="Cascade is a Python library and CLI for multi-tier AI agent orchestration across planner, worker, and local executor models." />
+  <meta name="theme-color" content="#07111f" />
+
+  <!-- Open Graph / Twitter (embedded SVG data URI) -->
+  <meta property="og:title" content="Cascade AI — Multi-Tier Agent Orchestration" />
+  <meta property="og:description" content="Cascade is a Python library and CLI for multi-tier AI agent orchestration across planner, worker, and local executor models." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'><rect width='1200' height='630' fill='rgb(7,17,31)' /><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop offset='0' stop-color='rgb(110,231,255)'/><stop offset='1' stop-color='rgb(139,92,246)'/></linearGradient></defs><g transform='translate(60,90)'><rect width='1080' height='450' rx='28' fill='url(#g)' opacity='0.08'/><g transform='translate(40,40)'><text x='0' y='90' font-family='Inter, system-ui, sans-serif' font-weight='800' font-size='72' fill='#e8f0ff'>Cascade AI</text><text x='0' y='150' font-family='Inter, system-ui, sans-serif' font-size='28' fill='#cfe7ff'>Multi-tier agent orchestration for planners, workers, and local executors</text><path d='M0 160 C80 120 160 200 240 160 C320 120 400 200 480 160 C560 120 640 200 720 160' fill='none' stroke='url(#g)' stroke-width='10' stroke-linecap='round' stroke-linejoin='round' opacity='0.95'/></g></g></svg>" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Cascade AI — Multi-Tier Agent Orchestration" />
+  <meta name="twitter:description" content="Cascade is a Python library and CLI for multi-tier AI agent orchestration across planner, worker, and local executor models." />
+  <meta name="twitter:image" content="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'><rect width='1200' height='630' fill='rgb(7,17,31)' /><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop offset='0' stop-color='rgb(110,231,255)'/><stop offset='1' stop-color='rgb(139,92,246)'/></linearGradient></defs><g transform='translate(60,90)'><rect width='1080' height='450' rx='28' fill='url(#g)' opacity='0.08'/><g transform='translate(40,40)'><text x='0' y='90' font-family='Inter, system-ui, sans-serif' font-weight='800' font-size='72' fill='#e8f0ff'>Cascade AI</text><text x='0' y='150' font-family='Inter, system-ui, sans-serif' font-size='28' fill='#cfe7ff'>Multi-tier agent orchestration for planners, workers, and local executors</text><path d='M0 160 C80 120 160 200 240 160 C320 120 400 200 480 160 C560 120 640 200 720 160' fill='none' stroke='url(#g)' stroke-width='10' stroke-linecap='round' stroke-linejoin='round' opacity='0.95'/></g></g></svg>" />
+
+  <!-- Inline SVG favicon as data URI (rgb colors to avoid # in URI) -->
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='rgb(7,17,31)'/><defs><linearGradient id='a' x1='0' x2='1'><stop offset='0' stop-color='rgb(110,231,255)'/><stop offset='1' stop-color='rgb(139,92,246)'/></linearGradient></defs><g transform='translate(8,12)'><path d='M6 18 C12 6 24 6 30 18' fill='none' stroke='url(#a)' stroke-width='4' stroke-linecap='round'/><circle cx='32' cy='18' r='6' fill='url(#a)'/></g></svg>" type="image/svg+xml" />
+
   <style>
-    :root {
-      --bg: #07111f;
-      --bg-soft: #0d1b2f;
-      --panel: rgba(13, 27, 47, 0.72);
-      --text: #e8f0ff;
-      --muted: #9fb3d9;
-      --accent: #6ee7ff;
-      --accent-2: #8b5cf6;
-      --border: rgba(255, 255, 255, 0.12);
-      --success: #7ef0b8;
-      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-    }
-
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at top left, rgba(110, 231, 255, 0.14), transparent 30%),
-        radial-gradient(circle at top right, rgba(139, 92, 246, 0.16), transparent 28%),
-        linear-gradient(180deg, #08101d 0%, #07111f 100%);
-      line-height: 1.6;
-    }
-
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-
-    .container {
-      width: min(1120px, calc(100% - 2rem));
-      margin: 0 auto;
-    }
-
-    .site-header {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      backdrop-filter: blur(14px);
-      background: rgba(7, 17, 31, 0.7);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 1rem 0;
-    }
-
-    .brand {
-      font-weight: 800;
-      letter-spacing: 0.02em;
-      color: var(--text);
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .nav-links a {
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-
-    .hero {
-      padding: 5rem 0 3rem;
-    }
-
-    .hero-grid {
-      display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      gap: 2rem;
-      align-items: center;
-    }
-
-    .eyebrow {
-      display: inline-block;
-      padding: 0.35rem 0.7rem;
-      border: 1px solid rgba(110, 231, 255, 0.25);
-      border-radius: 999px;
-      color: var(--accent);
-      background: rgba(110, 231, 255, 0.08);
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
-    }
-
-    h1, h2, h3 { line-height: 1.15; margin: 0 0 1rem; }
-    h1 { font-size: clamp(2.4rem, 5vw, 4.5rem); }
-    h2 { font-size: clamp(1.6rem, 3vw, 2.4rem); }
-    h3 { font-size: 1.1rem; }
-
-    .lead {
-      font-size: 1.1rem;
-      color: var(--muted);
-      max-width: 60ch;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-top: 1.5rem;
-    }
-
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.9rem 1.2rem;
-      border-radius: 0.9rem;
-      border: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text);
-      font-weight: 600;
-      text-decoration: none;
-    }
-
-    .button.primary {
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #04111d;
-      border: none;
-    }
-
-    .card, .code-block, .tier, .feature, .command, .info-box {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 1.2rem;
-      box-shadow: var(--shadow);
-    }
-
-    .card {
-      padding: 1.25rem;
-    }
-
-    .hero-card {
-      padding: 1.5rem;
-    }
-
-    .stack {
-      display: grid;
-      gap: 1rem;
-    }
-
-    .tier-flow {
-      display: grid;
-      gap: 0.9rem;
-      margin-top: 1rem;
-    }
-
-    .tier {
-      padding: 1rem;
-    }
-
-    .tier small {
-      color: var(--muted);
-      display: block;
-      margin-top: 0.35rem;
-    }
-
-    section {
-      padding: 2rem 0;
-    }
-
-    .section-intro {
-      margin-bottom: 1.25rem;
-      color: var(--muted);
-      max-width: 70ch;
-    }
-
-    .grid {
-      display: grid;
-      gap: 1rem;
-    }
-
-    .features-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .feature {
-      padding: 1.25rem;
-    }
-
-    .feature p,
-    .info-box p,
-    .command p {
-      margin: 0;
-      color: var(--muted);
-    }
-
-    .code-block {
-      padding: 1rem 1.1rem;
-      overflow-x: auto;
-    }
-
-    pre {
-      margin: 0;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-      font-size: 0.95rem;
-      color: #d9e7ff;
-    }
-
-    .commands-grid,
-    .info-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .command,
-    .info-box {
-      padding: 1.1rem;
-    }
-
-    ul.clean {
-      margin: 0;
-      padding-left: 1.1rem;
-      color: var(--muted);
-    }
-
-    .footer {
-      padding: 2.5rem 0 3rem;
-      color: var(--muted);
-      text-align: center;
-    }
-
-    .muted { color: var(--muted); }
-    .success { color: var(--success); }
-
-    @media (max-width: 900px) {
-      .hero-grid,
-      .features-grid,
-      .commands-grid,
-      .info-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .nav {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-    }
+    :root{--bg:#07111f;--bg-soft:#0d1b2f;--panel:rgba(13,27,47,0.72);--text:#e8f0ff;--muted:#9fb3d9;--accent:#6ee7ff;--accent-2:#8b5cf6;--border:rgba(255,255,255,0.12);--success:#7ef0b8;--shadow:0 20px 60px rgba(0,0,0,0.35)}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at top left, rgba(110,231,255,0.14), transparent 30%),radial-gradient(circle at top right, rgba(139,92,246,0.16), transparent 28%),linear-gradient(180deg,#08101d 0%,#07111f 100%);line-height:1.6;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}.container{width:min(1120px,calc(100% - 2rem));margin:0 auto}.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}.skip-link:focus{left:1rem;top:1rem;width:auto;height:auto;padding:0.5rem 0.75rem;background:var(--panel);border:1px solid var(--border);border-radius:6px;z-index:9999}.site-header{position:sticky;top:0;z-index:10;backdrop-filter:blur(14px);background:rgba(7,17,31,0.7);border-bottom:1px solid var(--border)}.nav{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0}.brand{font-weight:800;letter-spacing:0.02em;color:var(--text);display:inline-flex;gap:0.6rem;align-items:center}.nav-links{display:flex;gap:1rem;flex-wrap:wrap;align-items:center}.nav-links a{color:var(--muted);font-size:0.95rem}.nav-toggle{display:none;background:transparent;border:1px solid transparent;color:var(--muted);font-size:1rem;padding:0.4rem 0.6rem;border-radius:8px}.hero{padding:5rem 0 3rem}.hero-grid{display:grid;grid-template-columns:1.2fr 0.8fr;gap:2rem;align-items:center}.eyebrow{display:inline-block;padding:0.35rem 0.7rem;border:1px solid rgba(110,231,255,0.25);border-radius:999px;color:var(--accent);background:rgba(110,231,255,0.08);font-size:0.85rem;margin-bottom:1rem}h1,h2,h3{line-height:1.15;margin:0 0 1rem}h1{font-size:clamp(2.4rem,5vw,4.5rem)}h2{font-size:clamp(1.6rem,3vw,2.4rem)}h3{font-size:1.1rem}.lead{font-size:1.1rem;color:var(--muted);max-width:60ch}.hero-actions{display:flex;gap:1rem;flex-wrap:wrap;margin-top:1.5rem}.button{display:inline-flex;align-items:center;justify-content:center;padding:0.9rem 1.2rem;border-radius:0.9rem;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-weight:600;text-decoration:none}.button.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04111d;border:none}.card,.code-block,.tier,.feature,.command,.info-box{background:var(--panel);border:1px solid var(--border);border-radius:1.2rem;box-shadow:var(--shadow)}.card{padding:1.25rem}.hero-card{padding:1.5rem}.stack{display:grid;gap:1rem}.tier-flow{display:grid;gap:0.9rem;margin-top:1rem}.tier{padding:1rem}.tier small{color:var(--muted);display:block;margin-top:0.35rem}section{padding:2rem 0}.section-intro{margin-bottom:1.25rem;color:var(--muted);max-width:70ch}.grid{display:grid;gap:1rem}.features-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.feature{padding:1.25rem}.feature p,.info-box p,.command p{margin:0;color:var(--muted)}.code-block{padding:1rem 1.1rem;overflow-x:auto;position:relative}.code-block pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:0.95rem;color:#d9e7ff}.copy-btn{position:absolute;top:0.6rem;right:0.6rem;background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border);padding:0.35rem 0.6rem;border-radius:8px;font-size:0.85rem;cursor:pointer}.copy-btn:active{transform:translateY(1px)}.commands-grid,.info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.command,.info-box{padding:1.1rem}ul.clean{margin:0;padding-left:1.1rem;color:var(--muted)}.footer{padding:2.5rem 0 3rem;color:var(--muted);text-align:center}.muted{color:var(--muted)}.success{color:var(--success)}:focus-visible{outline:3px solid rgba(110,231,255,0.18);outline-offset:3px;border-radius:6px}@media(max-width:900px){.hero-grid,.features-grid,.commands-grid,.info-grid{grid-template-columns:1fr}.nav{flex-direction:row;align-items:center}.nav-toggle{display:inline-flex}.nav-links{display:none;flex-direction:column;gap:0;width:100%;margin-top:0.6rem;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:8px;padding:0.5rem}.nav-links.open{display:flex}.nav-links a{padding:0.5rem 0.75rem;width:100%}}
   </style>
 </head>
 <body>
-  <header class="site-header">
-    <div class="container nav">
-      <a class="brand" href="#top">🌊 Cascade AI</a>
-      <nav class="nav-links" aria-label="Primary navigation">
-        <a href="#overview">Overview</a>
-        <a href="#features">Features</a>
-        <a href="#quick-start">Quick Start</a>
-        <a href="#api">Python API</a>
-        <a href="#cli">CLI</a>
-      </nav>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header" role="banner">
+    <div class="container nav" role="navigation" aria-label="Primary">
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <a class="brand" href="#top">🌊 <strong>Cascade AI</strong></a>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <button class="nav-toggle" aria-expanded="false" aria-controls="primary-nav" id="navToggle">Menu</button>
+
+        <nav id="primary-nav" class="nav-links" aria-label="Primary navigation">
+          <a href="#overview">Overview</a>
+          <a href="#features">Features</a>
+          <a href="#quick-start">Quick Start</a>
+          <a href="#api">Python API</a>
+          <a href="#cli">CLI</a>
+        </nav>
+      </div>
     </div>
   </header>
 
-  <main id="top">
+  <main id="main" tabindex="-1">
     <section class="hero">
       <div class="container hero-grid">
         <div>
@@ -280,13 +60,13 @@
           </p>
           <div class="hero-actions">
             <a class="button primary" href="#quick-start">Get Started</a>
-            <a class="button" href="README.md">Read README</a>
+            <a class="button" href="README.md" rel="noopener">Read README</a>
           </div>
         </div>
 
-        <aside class="card hero-card">
-          <h3>Architecture</h3>
-          <div class="tier-flow">
+        <aside class="card hero-card" aria-labelledby="architecture-heading">
+          <h3 id="architecture-heading">Architecture</h3>
+          <div class="tier-flow" aria-hidden="false">
             <div class="tier">
               <strong>T1 Planner</strong>
               <small>High-capability orchestration and task planning</small>
@@ -362,7 +142,9 @@
       <div class="container">
         <h2>Quick Start</h2>
         <p class="section-intro">The project is packaged with <code>pyproject.toml</code> and exposes a <code>cascade</code> CLI entry point.</p>
-        <div class="code-block">
+
+        <div class="code-block" data-copy>
+          <button class="copy-btn" aria-label="Copy commands">Copy</button>
           <pre>pip install -e .
 cascade init
 cascade run "list all Python files and count lines of code"</pre>
@@ -374,7 +156,8 @@ cascade run "list all Python files and count lines of code"</pre>
       <div class="container">
         <h2>Python API</h2>
         <p class="section-intro">The public entry point is the <code>Cascade</code> class exported from <code>cascade.__init__</code>.</p>
-        <div class="code-block">
+        <div class="code-block" data-copy>
+          <button class="copy-btn" aria-label="Copy snippet">Copy</button>
           <pre>from cascade import Cascade
 
 agent = Cascade(config_path="./cascade.yaml")
@@ -407,7 +190,8 @@ print(f"Cost: ${result.total_cost:.4f}")</pre>
             <p><code>cascade init</code></p>
           </div>
         </div>
-        <div class="code-block" style="margin-top: 1rem;">
+        <div class="code-block" style="margin-top: 1rem;" data-copy>
+          <button class="copy-btn" aria-label="Copy commands">Copy</button>
           <pre>cascade run "task" --budget 0.50
 cascade run "task" --verbose
 cascade run "task" --root ./myproject</pre>
@@ -440,10 +224,95 @@ cascade run "task" --root ./myproject</pre>
     </section>
   </main>
 
-  <footer class="footer">
+  <footer class="footer" role="contentinfo">
     <div class="container">
       <p>Built for the Cascade AI project. This landing page was generated from the repository structure and documentation.</p>
+      <p style="margin-top:0.5rem;"><a href="https://github.com/Varun-SV/Cascade" target="_blank" rel="noopener">View on GitHub</a></p>
+      <p class="muted" style="font-size:0.9rem; margin-top:0.6rem;">&copy; <span id="year"></span> Cascade AI</p>
     </div>
   </footer>
+
+  <!-- Hidden inline SVG preview (keeps the SVG available in the page for platforms/tools that inspect page content) -->
+  <svg id="social-preview-inline" xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" style="position:absolute;width:1px;height:1px;left:-9999px;overflow:hidden" aria-hidden="true">
+    <rect width="1200" height="630" fill="rgb(7,17,31)"/>
+    <defs>
+      <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+        <stop offset="0" stop-color="rgb(110,231,255)"/>
+        <stop offset="1" stop-color="rgb(139,92,246)"/>
+      </linearGradient>
+    </defs>
+    <g transform="translate(60,90)">
+      <rect width="1080" height="450" rx="28" fill="url(#g)" opacity="0.08"/>
+      <g transform="translate(40,40)">
+        <text x="0" y="90" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="72" fill="#e8f0ff">Cascade AI</text>
+        <text x="0" y="150" font-family="Inter, system-ui, sans-serif" font-size="28" fill="#cfe7ff">Multi-tier agent orchestration for planners, workers, and local executors</text>
+        <path d="M0 160 C80 120 160 200 240 160 C320 120 400 200 480 160 C560 120 640 200 720 160" fill="none" stroke="url(#g)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+      </g>
+    </g>
+  </svg>
+
+  <div id="copyStatus" aria-live="polite" style="position:fixed; left:-9999px; top:auto;"></div>
+
+  <script>
+    // Mobile nav toggle
+    (function () {
+      const toggle = document.getElementById('navToggle');
+      const nav = document.getElementById('primary-nav');
+      if (!toggle || !nav) return;
+      toggle.addEventListener('click', function () {
+        const isOpen = nav.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', String(isOpen));
+      });
+    })();
+
+    // Copy-to-clipboard for code blocks
+    (function () {
+      function findPreText(codeBlock) {
+        const pre = codeBlock.querySelector('pre');
+        return pre ? pre.innerText : '';
+      }
+
+      const blocks = document.querySelectorAll('.code-block[data-copy]');
+      blocks.forEach((block) => {
+        const btn = block.querySelector('.copy-btn');
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+          const text = findPreText(block);
+          try {
+            await navigator.clipboard.writeText(text);
+            btn.textContent = 'Copied';
+            btn.setAttribute('aria-label', 'Copied');
+            setTimeout(() => {
+              btn.textContent = 'Copy';
+              btn.setAttribute('aria-label', 'Copy');
+            }, 1500);
+          } catch (err) {
+            // fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+              document.execCommand('copy');
+              btn.textContent = 'Copied';
+              setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+            } catch (e) {
+              alert('Copy not supported in this browser. Select and copy manually.');
+            }
+            document.body.removeChild(textarea);
+          }
+        });
+      });
+    })();
+
+    // Insert current year in footer
+    (function () {
+      const y = new Date().getFullYear();
+      const el = document.getElementById('year');
+      if (el) el.textContent = y;
+    })();
+  </script>
 </body>
 </html>
