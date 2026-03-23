@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cascade AI — Multi-Tier Agent Orchestration</title>
+  <meta name="description" content="Cascade is a Python library and CLI for multi-tier AI agent orchestration across planner, worker, and local executor models." />
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg-soft: #0d1b2f;
+      --panel: rgba(13, 27, 47, 0.72);
+      --text: #e8f0ff;
+      --muted: #9fb3d9;
+      --accent: #6ee7ff;
+      --accent-2: #8b5cf6;
+      --border: rgba(255, 255, 255, 0.12);
+      --success: #7ef0b8;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(110, 231, 255, 0.14), transparent 30%),
+        radial-gradient(circle at top right, rgba(139, 92, 246, 0.16), transparent 28%),
+        linear-gradient(180deg, #08101d 0%, #07111f 100%);
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      width: min(1120px, calc(100% - 2rem));
+      margin: 0 auto;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(14px);
+      background: rgba(7, 17, 31, 0.7);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 0;
+    }
+
+    .brand {
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .hero {
+      padding: 5rem 0 3rem;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 0.35rem 0.7rem;
+      border: 1px solid rgba(110, 231, 255, 0.25);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110, 231, 255, 0.08);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+
+    h1, h2, h3 { line-height: 1.15; margin: 0 0 1rem; }
+    h1 { font-size: clamp(2.4rem, 5vw, 4.5rem); }
+    h2 { font-size: clamp(1.6rem, 3vw, 2.4rem); }
+    h3 { font-size: 1.1rem; }
+
+    .lead {
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 60ch;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 1.5rem;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.9rem 1.2rem;
+      border-radius: 0.9rem;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .button.primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #04111d;
+      border: none;
+    }
+
+    .card, .code-block, .tier, .feature, .command, .info-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 1.2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .card {
+      padding: 1.25rem;
+    }
+
+    .hero-card {
+      padding: 1.5rem;
+    }
+
+    .stack {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .tier-flow {
+      display: grid;
+      gap: 0.9rem;
+      margin-top: 1rem;
+    }
+
+    .tier {
+      padding: 1rem;
+    }
+
+    .tier small {
+      color: var(--muted);
+      display: block;
+      margin-top: 0.35rem;
+    }
+
+    section {
+      padding: 2rem 0;
+    }
+
+    .section-intro {
+      margin-bottom: 1.25rem;
+      color: var(--muted);
+      max-width: 70ch;
+    }
+
+    .grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .features-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .feature {
+      padding: 1.25rem;
+    }
+
+    .feature p,
+    .info-box p,
+    .command p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .code-block {
+      padding: 1rem 1.1rem;
+      overflow-x: auto;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.95rem;
+      color: #d9e7ff;
+    }
+
+    .commands-grid,
+    .info-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .command,
+    .info-box {
+      padding: 1.1rem;
+    }
+
+    ul.clean {
+      margin: 0;
+      padding-left: 1.1rem;
+      color: var(--muted);
+    }
+
+    .footer {
+      padding: 2.5rem 0 3rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .muted { color: var(--muted); }
+    .success { color: var(--success); }
+
+    @media (max-width: 900px) {
+      .hero-grid,
+      .features-grid,
+      .commands-grid,
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .nav {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="#top">🌊 Cascade AI</a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#overview">Overview</a>
+        <a href="#features">Features</a>
+        <a href="#quick-start">Quick Start</a>
+        <a href="#api">Python API</a>
+        <a href="#cli">CLI</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <span class="eyebrow">Multi-tier AI agent orchestration</span>
+          <h1>Cascade coordinates planner, worker, and local models for coding tasks.</h1>
+          <p class="lead">
+            This project is a Python library and CLI that delegates work across model tiers to balance
+            capability, speed, and cost. It includes provider integrations, tool execution, escalation,
+            and optional budget tracking.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#quick-start">Get Started</a>
+            <a class="button" href="README.md">Read README</a>
+          </div>
+        </div>
+
+        <aside class="card hero-card">
+          <h3>Architecture</h3>
+          <div class="tier-flow">
+            <div class="tier">
+              <strong>T1 Planner</strong>
+              <small>High-capability orchestration and task planning</small>
+            </div>
+            <div class="tier">
+              <strong>T2 Worker</strong>
+              <small>Execution-focused model for delegated subtasks</small>
+            </div>
+            <div class="tier">
+              <strong>T3 Local Executor</strong>
+              <small>Fast local model via Ollama for lightweight actions</small>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="overview">
+      <div class="container">
+        <h2>Project Overview</h2>
+        <p class="section-intro">
+          Cascade is organized as a Python package with modules for core agent orchestration, provider
+          integrations, tool registries, configuration loading, budget tracking, and a Typer-based CLI.
+          The repository also includes tests for configuration, escalation, and tool behavior.
+        </p>
+        <div class="info-grid grid">
+          <div class="info-box">
+            <h3>Core package</h3>
+            <p><code>cascade/</code> contains the public API, CLI, providers, tools, orchestration logic, and utilities.</p>
+          </div>
+          <div class="info-box">
+            <h3>Testing</h3>
+            <p><code>tests/</code> covers tool execution, config loading, and escalation-related behavior.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="container">
+        <h2>Features</h2>
+        <p class="section-intro">Based on the repository contents and README, these are the main capabilities of the project.</p>
+        <div class="features-grid grid">
+          <article class="feature">
+            <h3>Three-tier delegation</h3>
+            <p>Planner, worker, and local executor roles allow tasks to cascade to the right capability level.</p>
+          </article>
+          <article class="feature">
+            <h3>Multiple providers</h3>
+            <p>Supports Anthropic, OpenAI, Google, and Ollama through dedicated provider modules.</p>
+          </article>
+          <article class="feature">
+            <h3>Built-in tools</h3>
+            <p>Includes file operations, shell commands, code search, git actions, and web access.</p>
+          </article>
+          <article class="feature">
+            <h3>Escalation policy</h3>
+            <p>Confidence-based escalation helps agents hand work upward when needed.</p>
+          </article>
+          <article class="feature">
+            <h3>Budget tracking</h3>
+            <p>Optional session and per-model cost controls are available through the budget tracker.</p>
+          </article>
+          <article class="feature">
+            <h3>CLI + Python API</h3>
+            <p>Use Cascade from the command line or integrate it directly into Python applications.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="quick-start">
+      <div class="container">
+        <h2>Quick Start</h2>
+        <p class="section-intro">The project is packaged with <code>pyproject.toml</code> and exposes a <code>cascade</code> CLI entry point.</p>
+        <div class="code-block">
+          <pre>pip install -e .
+cascade init
+cascade run "list all Python files and count lines of code"</pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="api">
+      <div class="container">
+        <h2>Python API</h2>
+        <p class="section-intro">The public entry point is the <code>Cascade</code> class exported from <code>cascade.__init__</code>.</p>
+        <div class="code-block">
+          <pre>from cascade import Cascade
+
+agent = Cascade(config_path="./cascade.yaml")
+result = agent.run("add error handling to auth.py")
+
+print(result.summary)
+print(f"Cost: ${result.total_cost:.4f}")</pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="cli">
+      <div class="container">
+        <h2>CLI Commands</h2>
+        <div class="commands-grid grid">
+          <div class="command">
+            <h3>Run a task</h3>
+            <p><code>cascade run "task"</code></p>
+          </div>
+          <div class="command">
+            <h3>List models</h3>
+            <p><code>cascade models</code></p>
+          </div>
+          <div class="command">
+            <h3>Show config</h3>
+            <p><code>cascade config-info</code></p>
+          </div>
+          <div class="command">
+            <h3>Initialize config</h3>
+            <p><code>cascade init</code></p>
+          </div>
+        </div>
+        <div class="code-block" style="margin-top: 1rem;">
+          <pre>cascade run "task" --budget 0.50
+cascade run "task" --verbose
+cascade run "task" --root ./myproject</pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="configuration">
+      <div class="container">
+        <h2>Configuration Highlights</h2>
+        <div class="info-grid grid">
+          <div class="info-box">
+            <h3>Default model IDs</h3>
+            <ul class="clean">
+              <li><code>planner</code></li>
+              <li><code>worker</code></li>
+              <li><code>local</code></li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <h3>Environment variables</h3>
+            <ul class="clean">
+              <li><code>CASCADE_ANTHROPIC_API_KEY</code></li>
+              <li><code>CASCADE_OPENAI_API_KEY</code></li>
+              <li><code>CASCADE_GOOGLE_API_KEY</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Built for the Cascade AI project. This landing page was generated from the repository structure and documentation.</p>
+    </div>
+  </footer>
+</body>
+</html>
