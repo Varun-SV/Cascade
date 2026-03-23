@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cascade-ai"
+version = "0.1.0"
+description = "Multi-tier AI agent orchestration — tasks cascade from large models to small ones."
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Varun S V"},
+]
+keywords = ["ai", "agents", "llm", "orchestration", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0.0",
+    "openai>=1.0.0",
+    "anthropic>=0.30.0",
+    "google-genai>=1.0.0",
+    "httpx>=0.27.0",
+    "gitpython>=3.1.0",
+    "beautifulsoup4>=4.12.0",
+    "duckduckgo-search>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+]
+
+[project.scripts]
+cascade = "cascade.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/varunsv/cascade-ai"
+
+[tool.setuptools.packages.find]
+include = ["cascade*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
