@@ -12,7 +12,7 @@ from cascade.providers.base import (
     Message,
     Role,
 )
-from cascade.tools.base import Tier, ToolRegistry
+from cascade.tools.base import ToolRegistry
 
 
 EXECUTOR_SYSTEM_PROMPT = """You are a T3 Executor in the Cascade multi-tier AI system.
@@ -64,7 +64,7 @@ class Executor:
 
         Returns (success, result_text, confidence_score).
         """
-        tool_schemas = self.tool_registry.get_schemas_for_tier(Tier.T3)
+        tool_schemas = self.tool_registry.get_schemas(["all"])
 
         messages: list[Message] = [
             Message(role=Role.SYSTEM, content=EXECUTOR_SYSTEM_PROMPT),
@@ -132,7 +132,7 @@ class Executor:
                     await on_tool_call(tc.name, tc.arguments)
 
                 result = await self.tool_registry.execute(
-                    name=tc.name, tier=Tier.T3, **tc.arguments
+                    name=tc.name, allowed_names=["all"], **tc.arguments
                 )
 
                 if not result.success:
@@ -155,12 +155,8 @@ class Executor:
                 subtask.tool_calls_made += 1
 
             # Check escalation
-            should_escalate, reason = self.escalation_policy.should_t3_escalate(
-                confidence=confidence,
-                retries=len(errors),
-                error=errors[-1] if errors else "",
-            )
-            if should_escalate:
+            if self.escalation_policy.should_escalate(confidence=confidence, attempts=len(errors)):
+                reason = errors[-1] if errors else "Executor requested escalation."
                 subtask.mark_escalated(reason)
                 return False, reason, confidence
 

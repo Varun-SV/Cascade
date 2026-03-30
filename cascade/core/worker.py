@@ -14,7 +14,7 @@ from cascade.providers.base import (
     Role,
     ToolSchema,
 )
-from cascade.tools.base import Tier, ToolRegistry, ToolResult
+from cascade.tools.base import ToolRegistry
 
 
 WORKER_SYSTEM_PROMPT = """You are a T2 Worker agent in the Cascade multi-tier AI system.
@@ -67,7 +67,7 @@ class Worker:
 
         Returns (success, result_text, confidence_score).
         """
-        tool_schemas = self.tool_registry.get_schemas_for_tier(Tier.T2)
+        tool_schemas = self.tool_registry.get_schemas(["all"])
         messages: list[Message] = [
             Message(role=Role.SYSTEM, content=WORKER_SYSTEM_PROMPT),
         ]
@@ -125,7 +125,7 @@ class Worker:
 
                 # Execute the tool
                 result = await self.tool_registry.execute(
-                    name=tc.name, tier=Tier.T2, **tc.arguments
+                    name=tc.name, allowed_names=["all"], **tc.arguments
                 )
 
                 if not result.success:
@@ -149,12 +149,8 @@ class Worker:
                 subtask.tool_calls_made += 1
 
             # Check escalation
-            should_escalate, reason = self.escalation_policy.should_t2_escalate(
-                confidence=confidence,
-                retries=len(errors),
-                error=errors[-1] if errors else "",
-            )
-            if should_escalate:
+            if self.escalation_policy.should_escalate(confidence=confidence, attempts=len(errors)):
+                reason = errors[-1] if errors else "Worker requested escalation."
                 subtask.mark_escalated(reason)
                 return False, reason, confidence
 

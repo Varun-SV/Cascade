@@ -9,7 +9,7 @@ from typing import Any
 from cascade.core.escalation import EscalationContext, EscalationPolicy
 from cascade.core.task import SubTask, TaskPlan, TierAssignment
 from cascade.providers.base import BaseProvider, Message, Role, ToolSchema
-from cascade.tools.base import ToolRegistry, Tier
+from cascade.tools.base import ToolRegistry
 
 
 ORCHESTRATOR_SYSTEM_PROMPT = """You are the T1 Orchestrator in a multi-tier AI agent system called Cascade.

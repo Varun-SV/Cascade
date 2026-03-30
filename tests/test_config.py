@@ -23,6 +23,7 @@ class TestCascadeConfig:
         assert config.escalation.confidence_threshold == 0.5
         assert config.budget.enabled is False
         assert config.auditor_enabled is True  # New auditor toggle
+        assert config.approvals.mode == "guarded"
 
     def test_load_from_yaml(self, tmp_path):
         """Should load config from a YAML file."""
@@ -43,6 +44,10 @@ class TestCascadeConfig:
                 "enabled": True,
                 "session_max_cost": 1.00,
             },
+            "approvals": {
+                "mode": "strict",
+                "allowed_command_prefixes": ["pytest", ["git", "status"]],
+            },
         }
 
         config_file = tmp_path / "cascade.yaml"
@@ -57,6 +62,8 @@ class TestCascadeConfig:
         assert config.budget.enabled is True
         assert config.budget.session_max_cost == 1.00
         assert config.auditor_enabled is False
+        assert config.approvals.mode == "strict"
+        assert config.approvals.allowed_command_prefixes == [["pytest"], ["git", "status"]]
 
     def test_env_var_override(self, monkeypatch):
         """API keys should be loadable from environment variables."""

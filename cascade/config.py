@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import os
+import shlex
 from pathlib import Path
 from typing import Any, Optional
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from cascade.core.approval import ApprovalMode
 
 
 class ModelConfig(BaseModel):
@@ -49,6 +52,29 @@ class BudgetConfig(BaseModel):
     model_max_cost: dict[str, float] = Field(default_factory=dict)
 
 
+class ApprovalsConfig(BaseModel):
+    """Approval controls for guarded tool execution."""
+
+    mode: ApprovalMode = ApprovalMode.GUARDED
+    allowed_command_prefixes: list[list[str]] = Field(default_factory=list)
+
+    @field_validator("allowed_command_prefixes", mode="before")
+    @classmethod
+    def _normalize_prefixes(cls, value: Any) -> list[list[str]]:
+        if value in (None, ""):
+            return []
+
+        normalized: list[list[str]] = []
+        for item in value:
+            if isinstance(item, str):
+                tokens = shlex.split(item)
+            else:
+                tokens = [str(part) for part in item]
+            if tokens:
+                normalized.append(tokens)
+        return normalized
+
+
 class CascadeConfig(BaseModel):
     """Root configuration for Cascade."""
 
@@ -85,6 +111,7 @@ class CascadeConfig(BaseModel):
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
     escalation: EscalationConfig = Field(default_factory=EscalationConfig)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
+    approvals: ApprovalsConfig = Field(default_factory=ApprovalsConfig)
     project_root: str = "."
     verbose: bool = False
     log_file: Optional[str] = None

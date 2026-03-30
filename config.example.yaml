@@ -51,6 +51,14 @@ budget:
   enabled: false
   session_max_cost: null           # Total across all models
 
+# ── Approvals ───────────────────────────────────────────────────────
+# Guard risky writes, git mutations, and non-read-only shell/process tools.
+approvals:
+  mode: guarded                    # guarded | power_user | strict
+  allowed_command_prefixes:
+    - ["pytest"]
+    - ["git", "status"]
+
 # ── General ─────────────────────────────────────────────────────────
 project_root: "."                 # Sandbox root for file operations
 verbose: false

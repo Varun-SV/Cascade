@@ -6,6 +6,7 @@ import json
 from typing import Any, Callable
 
 from cascade.config import CascadeConfig
+from cascade.core.approval import ApprovalHandler
 from cascade.core.escalation import EscalationContext, EscalationPolicy
 from cascade.core.task import SubTask, TaskStatus
 from cascade.providers.base import (
@@ -42,20 +43,24 @@ Your role is to complete the assigned task using the tools provided.
 If the task is simple and you have the right tools, execute it directly.
 If the task is highly complex, breaks down into many distinct parts, or requires capabilities you don't have, you MUST use the `delegate_task` tool to spawn child agents to help you.
 
+Tools available to you right now:
+{current_tools_list}
+
 Available Models for Delegation:
 {models_list}
 
-Available Tools for Delegation (select ONLY what the child needs):
-{tools_list}
+Available Tools to grant to child agents (select ONLY what the child needs):
+{delegation_tools_list}
 
 CRITICAL Guidelines:
-1. **Think before acting**: Before calling ANY tool, first analyze the task and decide what specific steps you need to take. Do NOT immediately start reading files or listing directories — only use tools that are directly needed for the task.
-2. **Be targeted with reads**: Only read files that are directly relevant to the task. Do NOT read every file in a directory. If the task is to create something new, you may not need to read anything at all.
-3. **Reading ≠ Completion**: Reading an existing file is a step, NOT the end goal. After gathering information, you MUST proceed to actually complete the task (e.g., create, edit, or run something). Never stop just because you read a file.
-4. **Create even if files exist**: When asked to create a new file or project, the presence of other files in the directory does NOT mean the task is done. Proceed to create the requested content.
-5. **Delegate wisely**: If you have no tools other than `delegate_task`, you MUST act purely as an orchestrator and delegate all work to child agents. You may pass `["all"]` to grant them full capabilities.
-6. **Always provide a detailed summary**: When finished, provide a clear, detailed summary of exactly what you accomplished — list files created, changes made, commands run, etc. Never respond with just "done" or an empty message.
-7. **Verify your work**: After editing code, read back edited files to confirm correctness.
+1. **Think before acting**: Before calling ANY tool, first analyze the task and decide what specific steps you need to take.
+2. **Discover efficiently**: Prefer `find_files`, `glob_files`, or `grep_search` before broad directory reads. Use `read_files` when you need context from multiple files.
+3. **Edit with the right tool**: Prefer `search_replace` for focused substitutions and `apply_patch` for coordinated multi-file edits. Use `write_file` for brand-new files or full rewrites when needed.
+4. **Use processes sparingly**: Prefer a one-shot `run_command` unless you truly need an interactive process session.
+5. **Reading ≠ Completion**: Reading an existing file is a step, NOT the end goal. After gathering information, you MUST proceed to actually complete the task.
+6. **Delegate wisely**: If the task breaks into distinct subtasks or another model is a better fit, delegate. When delegating, grant the child only the tools it actually needs.
+7. **Always provide a detailed summary**: When finished, provide a clear, detailed summary of exactly what you accomplished — list files created, changes made, commands run, etc.
+8. **Verify your work**: After editing code, read back edited files or inspect diffs to confirm correctness.
 """
 
 class CascadeAgent:
@@ -72,6 +77,7 @@ class CascadeAgent:
         provider_factory: Callable[[str], BaseProvider],
         max_iterations: int = 30,
         cost_callback: Any = None,
+        approval_handler: ApprovalHandler | None = None,
     ):
         self.model_id = model_id
         self.provider = provider
@@ -82,6 +88,7 @@ class CascadeAgent:
         self.provider_factory = provider_factory
         self.max_iterations = max_iterations
         self.cost_callback = cost_callback
+        self.approval_handler = approval_handler
 
     def _get_system_prompt(self) -> str:
         models_info = []
@@ -96,15 +103,23 @@ class CascadeAgent:
                 
             models_info.append(f"- {m.id} ({m.provider}/{m.model}){desc}")
             
-        tools_info = []
+        current_tools = self.tool_registry.get_tools(self.allowed_tools)
+        current_tools_info = []
+        for tool in current_tools:
+            current_tools_info.append(f"- {tool.name}: {tool.description}")
+        if not current_tools_info:
+            current_tools_info.append("- No direct tools besides delegate_task.")
+
+        delegation_tools_info = []
         for name, tool in self.tool_registry._tools.items():
             if name != "delegate_task":
-                tools_info.append(f"- {name}: {tool.description}")
+                delegation_tools_info.append(f"- {name}: {tool.description}")
         
         return AGENT_SYSTEM_PROMPT.format(
             model_id=self.model_id,
+            current_tools_list="\n".join(current_tools_info),
             models_list="\n".join(models_info),
-            tools_list="\n".join(tools_info),
+            delegation_tools_list="\n".join(delegation_tools_info),
         )
 
     async def execute_subtask(
@@ -116,6 +131,7 @@ class CascadeAgent:
         on_agent_spawn: Any = None,
         on_auditor_block: Any = None,
         on_tool_result: Any = None,
+        on_approval_request: Any = None,
     ) -> tuple[bool, str, float]:
         """Execute the subtask."""
         # Get standard tool schemas
@@ -192,7 +208,8 @@ class CascadeAgent:
                         on_thinking, 
                         on_agent_spawn,
                         on_auditor_block,
-                        on_tool_result
+                        on_tool_result,
+                        on_approval_request,
                     )
                     
                     if child_success:
@@ -259,6 +276,9 @@ class CascadeAgent:
                 result = await self.tool_registry.execute(
                     name=tc.name,
                     allowed_names=self.allowed_tools,
+                    approval_mode=self.config.approvals.mode,
+                    approval_handler=on_approval_request or self.approval_handler,
+                    allowed_command_prefixes=self.config.approvals.allowed_command_prefixes,
                     **tc.arguments
                 )
 
@@ -303,6 +323,7 @@ class CascadeAgent:
         on_agent_spawn: Any,
         on_auditor_block: Any,
         on_tool_result: Any,
+        on_approval_request: Any,
     ) -> tuple[str, bool]:
         """Create and run a child agent."""
         desc = args.get("description", "")
@@ -341,6 +362,7 @@ class CascadeAgent:
             provider_factory=self.provider_factory,
             max_iterations=self.max_iterations,
             cost_callback=self.cost_callback,
+            approval_handler=on_approval_request or self.approval_handler,
         )
 
         success, result_text, conf = await child_agent.execute_subtask(
@@ -350,6 +372,7 @@ class CascadeAgent:
             on_agent_spawn=on_agent_spawn,
             on_auditor_block=on_auditor_block,
             on_tool_result=on_tool_result,
+            on_approval_request=on_approval_request,
         )
         
         output = f"Child {child_model_id} finished (Success={success}, Confidence={conf:.2f}):\n{result_text}"

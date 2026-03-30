@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import warnings
 
 # Suppress unclosed transport warnings from asyncio/httpx
@@ -12,8 +13,10 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.prompt import Confirm
 
 from cascade import __version__
+from cascade.core.approval import ApprovalDecision, ApprovalMode, ApprovalRequest
 
 app = typer.Typer(
     name="cascade",
@@ -22,6 +25,30 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False,
 )
 console = Console()
+
+
+def _build_cli_approval_handler() -> callable:
+    """Create a TTY-aware approval prompt for risky tool actions."""
+
+    async def _approve(request: ApprovalRequest) -> ApprovalDecision:
+        if not sys.stdin.isatty() or not sys.stdout.isatty():
+            return ApprovalDecision(
+                approved=False,
+                reason="Approval required, but Cascade is not running in an interactive terminal.",
+            )
+
+        console.print()
+        console.print(
+            f"[bold yellow]Approval required[/bold yellow] for "
+            f"[bold]{request.tool_name}[/bold]: {request.reason}"
+        )
+        if request.summary:
+            console.print(f"[dim]{request.summary}[/dim]")
+
+        approved = Confirm.ask("Allow this action?", default=False)
+        return ApprovalDecision(approved=approved)
+
+    return _approve
 
 
 @app.command()
@@ -35,6 +62,9 @@ def run(
     ),
     budget: Optional[float] = typer.Option(
         None, "--budget", "-b", help="Max session cost in dollars"
+    ),
+    approval_mode: Optional[str] = typer.Option(
+        None, "--approval-mode", help="Approval mode: guarded, power_user, or strict"
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
     no_auditor: bool = typer.Option(False, "--no-auditor", help="Disable the Sentinel Auditor safety checks"),
@@ -65,11 +95,14 @@ def run(
     if budget is not None:
         cfg.budget.enabled = True
         cfg.budget.session_max_cost = budget
+    if approval_mode is not None:
+        cfg.approvals.mode = ApprovalMode(approval_mode)
 
     # Create agent
     agent = Cascade(
         config=cfg,
         project_root=project_root or ".",
+        approval_callback=_build_cli_approval_handler(),
     )
 
     # Wire up display callbacks
@@ -241,6 +274,8 @@ def init(
             "  - id: local\n"
             "    provider: ollama\n"
             "    model: qwen2.5-coder:7b\n"
+            "approvals:\n"
+            "  mode: guarded\n"
         )
     else:
         shutil.copy(example, target)
@@ -258,6 +293,9 @@ def chat(
     ),
     budget: Optional[float] = typer.Option(
         None, "--budget", "-b", help="Max session cost in dollars"
+    ),
+    approval_mode: Optional[str] = typer.Option(
+        None, "--approval-mode", help="Approval mode: guarded, power_user, or strict"
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
     no_auditor: bool = typer.Option(False, "--no-auditor", help="Disable the Sentinel Auditor safety checks"),
@@ -289,10 +327,13 @@ def chat(
     if budget is not None:
         cfg.budget.enabled = True
         cfg.budget.session_max_cost = budget
+    if approval_mode is not None:
+        cfg.approvals.mode = ApprovalMode(approval_mode)
 
     agent = Cascade(
         config=cfg,
         project_root=project_root or ".",
+        approval_callback=_build_cli_approval_handler(),
     )
 
     # Wire up display callbacks

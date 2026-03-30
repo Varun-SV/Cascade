@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from cascade.budget.tracker import CostTracker
+from cascade.core.approval import ApprovalHandler
 from cascade.config import CascadeConfig, ModelConfig, load_config
 from cascade.core.agent import CascadeAgent
 from cascade.core.escalation import EscalationPolicy
@@ -25,19 +26,55 @@ from cascade.core.task import (
 )
 from cascade.providers.base import BaseProvider
 from cascade.tools.base import ToolRegistry
-from cascade.tools.code_search import FindFilesTool, GrepSearchTool
+from cascade.tools.code_search import GrepSearchTool
 from cascade.tools.file_ops import (
+    ApplyPatchTool,
+    DeletePathTool,
     EditFileTool,
+    FindFilesTool,
+    GlobFilesTool,
     ListDirectoryTool,
     ReadFileTool,
+    ReadFilesTool,
+    SearchReplaceTool,
+    MovePathTool,
     WriteFileTool,
 )
-from cascade.tools.git_ops import GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool
-from cascade.tools.shell import RunCommandTool
+from cascade.tools.git_ops import (
+    GitAddTool,
+    GitCheckoutTool,
+    GitCommitTool,
+    GitDiffTool,
+    GitLogTool,
+    GitShowTool,
+    GitStatusTool,
+)
+from cascade.tools.shell import (
+    ProcessManager,
+    ReadProcessOutputTool,
+    RunCommandTool,
+    StartProcessTool,
+    StopProcessTool,
+    WriteProcessInputTool,
+)
 from cascade.tools.web import FetchURLTool, WebSearchTool
 from cascade.utils.logger import setup_logger
 
 logger = logging.getLogger("cascade")
+
+
+ROOT_DISCOVERY_TOOLS = [
+    "list_directory",
+    "read_file",
+    "read_files",
+    "find_files",
+    "glob_files",
+    "grep_search",
+    "git_status",
+    "git_diff",
+    "git_log",
+    "git_show",
+]
 
 
 def _create_provider(model_config: ModelConfig, config: CascadeConfig) -> BaseProvider:
@@ -79,25 +116,39 @@ def _create_provider(model_config: ModelConfig, config: CascadeConfig) -> BasePr
 def _create_tool_registry(project_root: str) -> ToolRegistry:
     """Create and populate the tool registry."""
     registry = ToolRegistry()
+    process_manager = ProcessManager(project_root)
 
     # File operations
     registry.register(ReadFileTool(project_root))
+    registry.register(ReadFilesTool(project_root))
     registry.register(WriteFileTool(project_root))
     registry.register(EditFileTool(project_root))
+    registry.register(SearchReplaceTool(project_root))
+    registry.register(ApplyPatchTool(project_root))
+    registry.register(MovePathTool(project_root))
+    registry.register(DeletePathTool(project_root))
     registry.register(ListDirectoryTool(project_root))
+    registry.register(GlobFilesTool(project_root))
+    registry.register(FindFilesTool(project_root))
 
     # Shell
     registry.register(RunCommandTool(project_root))
+    registry.register(StartProcessTool(project_root, process_manager))
+    registry.register(ReadProcessOutputTool(process_manager))
+    registry.register(WriteProcessInputTool(process_manager))
+    registry.register(StopProcessTool(process_manager))
 
     # Code search
     registry.register(GrepSearchTool(project_root))
-    registry.register(FindFilesTool(project_root))
 
     # Git
     registry.register(GitStatusTool(project_root))
     registry.register(GitDiffTool(project_root))
     registry.register(GitLogTool(project_root))
+    registry.register(GitShowTool(project_root))
+    registry.register(GitAddTool(project_root))
     registry.register(GitCommitTool(project_root))
+    registry.register(GitCheckoutTool(project_root))
 
     # Web
     registry.register(FetchURLTool())
@@ -116,6 +167,7 @@ class Cascade:
         config_path: Optional[str] = None,
         config: Optional[CascadeConfig] = None,
         project_root: Optional[str] = None,
+        approval_callback: ApprovalHandler | None = None,
     ):
         self.config = config or load_config(config_path)
 
@@ -152,6 +204,7 @@ class Cascade:
         self.on_auditor_block: Optional[Callable] = None
         self.on_escalation: Optional[Callable] = None
         self.on_validation: Optional[Callable] = None
+        self.on_approval_request: Optional[ApprovalHandler] = approval_callback
 
     def _track_cost(self, model_id: str, amount: float) -> None:
         """Callback for agents to report their costs."""
@@ -186,17 +239,18 @@ class Cascade:
             config=self.config,
             tool_registry=self.tool_registry,
             escalation_policy=self.escalation_policy,
-            allowed_tools=[],
+            allowed_tools=ROOT_DISCOVERY_TOOLS,
             provider_factory=self._get_provider,
             max_iterations=60,  # Root agent has higher iterations allowance
             cost_callback=self._track_cost,
+            approval_handler=self.on_approval_request,
         )
 
         subtask = SubTask(
             id=str(uuid.uuid4())[:8],
             description=task_description,
             assigned_model=root_model_id,
-            assigned_tools=["all"],  # It can assigned all tools to its children
+            assigned_tools=ROOT_DISCOVERY_TOOLS,
         )
         
         # We can map the legacy `on_tier_start` callback to when agents spawn
@@ -215,6 +269,7 @@ class Cascade:
             on_agent_spawn=handle_agent_spawn,
             on_auditor_block=self.on_auditor_block,
             on_tool_result=self.on_tool_result,
+            on_approval_request=self.on_approval_request,
         )
 
         subtask_results = [

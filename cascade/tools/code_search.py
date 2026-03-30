@@ -1,13 +1,14 @@
-"""Code search tools — grep and file finding."""
+"""Code search tools."""
 
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import os
 from pathlib import Path
 from typing import Any
 
-from cascade.tools.base import BaseTool, ToolResult
+from cascade.tools.base import BaseTool, ToolCapability, ToolResult
 
 
 class GrepSearchTool(BaseTool):
@@ -41,7 +42,7 @@ class GrepSearchTool(BaseTool):
         },
         "required": ["query"],
     }
-
+    capabilities = (ToolCapability.READ,)
 
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root).resolve()
@@ -58,8 +59,13 @@ class GrepSearchTool(BaseTool):
         search_path = Path(path)
         if not search_path.is_absolute():
             search_path = self.project_root / search_path
+        search_path = search_path.resolve()
 
-        # Try ripgrep first
+        try:
+            search_path.relative_to(self.project_root)
+        except ValueError:
+            return ToolResult(success=False, error=f"Access denied: {search_path}")
+
         try:
             return await self._rg_search(query, str(search_path), include, case_insensitive)
         except FileNotFoundError:
@@ -68,7 +74,6 @@ class GrepSearchTool(BaseTool):
     async def _rg_search(
         self, query: str, path: str, include: str, case_insensitive: bool
     ) -> ToolResult:
-        """Search using ripgrep."""
         cmd = ["rg", "--line-number", "--no-heading", "--max-count=50"]
         if case_insensitive:
             cmd.append("-i")
@@ -81,9 +86,8 @@ class GrepSearchTool(BaseTool):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
+        stdout, _stderr = await proc.communicate()
         output = stdout.decode("utf-8", errors="replace").strip()
-
         if not output:
             return ToolResult(output="No matches found.")
         return ToolResult(output=output)
@@ -91,127 +95,35 @@ class GrepSearchTool(BaseTool):
     async def _python_search(
         self, query: str, path: Path, include: str, case_insensitive: bool
     ) -> ToolResult:
-        """Fallback Python-based search."""
-        import fnmatch
-
         results: list[str] = []
         search_query = query.lower() if case_insensitive else query
-        max_results = 50
 
         for root, dirs, files in os.walk(path):
-            # Skip hidden and common ignore dirs
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in {"node_modules", "__pycache__", ".git"}]
+            dirs[:] = [
+                directory
+                for directory in dirs
+                if not directory.startswith(".")
+                and directory not in {"node_modules", "__pycache__", ".git"}
+            ]
 
-            for fname in files:
-                if include and not fnmatch.fnmatch(fname, include):
+            for filename in files:
+                if include and not fnmatch.fnmatch(filename, include):
                     continue
 
-                fpath = Path(root) / fname
+                candidate = Path(root) / filename
                 try:
-                    content = fpath.read_text(encoding="utf-8", errors="ignore")
-                    for i, line in enumerate(content.splitlines(), 1):
-                        check_line = line.lower() if case_insensitive else line
-                        if search_query in check_line:
-                            rel = fpath.relative_to(self.project_root)
-                            results.append(f"{rel}:{i}: {line.strip()}")
-                            if len(results) >= max_results:
-                                break
+                    content = candidate.read_text(encoding="utf-8", errors="ignore")
                 except (PermissionError, UnicodeDecodeError):
                     continue
 
-                if len(results) >= max_results:
-                    break
-            if len(results) >= max_results:
-                break
+                for line_number, line in enumerate(content.splitlines(), start=1):
+                    haystack = line.lower() if case_insensitive else line
+                    if search_query in haystack:
+                        rel = candidate.relative_to(self.project_root)
+                        results.append(f"{rel}:{line_number}: {line.strip()}")
+                        if len(results) >= 50:
+                            return ToolResult(output="\n".join(results))
 
         if not results:
             return ToolResult(output="No matches found.")
         return ToolResult(output="\n".join(results))
-
-
-class FindFilesTool(BaseTool):
-    """Find files by name pattern."""
-
-    name = "find_files"
-    description = (
-        "Find files and directories matching a name pattern. "
-        "Supports glob patterns like '*.py', 'test_*', etc."
-    )
-    parameters_schema = {
-        "type": "object",
-        "properties": {
-            "pattern": {
-                "type": "string",
-                "description": "Glob pattern to match file names (e.g., '*.py', 'test_*').",
-            },
-            "path": {
-                "type": "string",
-                "description": "Directory to search in. Defaults to project root.",
-            },
-            "max_depth": {
-                "type": "integer",
-                "description": "Maximum directory depth to search. Default is 10.",
-            },
-        },
-        "required": ["pattern"],
-    }
-
-
-    def __init__(self, project_root: str = "."):
-        self.project_root = Path(project_root).resolve()
-
-    async def execute(self, **kwargs: Any) -> ToolResult:
-        pattern = kwargs.get("pattern", "")
-        path = kwargs.get("path", ".") or "."
-        max_depth = kwargs.get("max_depth", 10)
-
-        if not pattern:
-            return ToolResult(success=False, error="No pattern provided")
-
-        search_path = Path(path)
-        if not search_path.is_absolute():
-            search_path = self.project_root / search_path
-
-        if not search_path.exists():
-            return ToolResult(success=False, error=f"Path not found: {path}")
-
-        results: list[str] = []
-        max_results = 50
-        self._find_recursive(search_path, pattern, max_depth, 0, results, max_results)
-
-        if not results:
-            return ToolResult(output=f"No files matching '{pattern}' found.")
-        return ToolResult(output="\n".join(results))
-
-    def _find_recursive(
-        self,
-        current: Path,
-        pattern: str,
-        max_depth: int,
-        depth: int,
-        results: list[str],
-        max_results: int,
-    ) -> None:
-        if depth > max_depth or len(results) >= max_results:
-            return
-
-        try:
-            for item in sorted(current.iterdir()):
-                if item.name.startswith("."):
-                    continue
-                if len(results) >= max_results:
-                    break
-
-                import fnmatch
-                if fnmatch.fnmatch(item.name, pattern):
-                    try:
-                        rel = item.relative_to(self.project_root)
-                    except ValueError:
-                        rel = item
-                    prefix = "📁" if item.is_dir() else "📄"
-                    results.append(f"{prefix} {rel}")
-
-                if item.is_dir() and item.name not in {"node_modules", "__pycache__", ".git"}:
-                    self._find_recursive(item, pattern, max_depth, depth + 1, results, max_results)
-        except PermissionError:
-            pass
