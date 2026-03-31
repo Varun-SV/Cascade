@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from cascade.tools.base import BaseTool, ToolCapability, ToolResult
+from cascade.tools.base import BaseTool, ToolCapability, ToolResult, ToolScope
 
 
 class GrepSearchTool(BaseTool):
@@ -43,6 +43,8 @@ class GrepSearchTool(BaseTool):
         "required": ["query"],
     }
     capabilities = (ToolCapability.READ,)
+    scope = ToolScope.FILE
+    cache_ttl_seconds = 5
 
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root).resolve()

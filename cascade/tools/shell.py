@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 import os
 import shlex
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from cascade.core.approval import ApprovalMode, ApprovalRequest
-from cascade.tools.base import BaseTool, ToolCapability, ToolResult, ToolRisk
+from cascade.tools.base import BaseTool, ToolCapability, ToolResult, ToolRisk, ToolScope
 
 SAFE_COMMAND_PREFIXES = [
     ("pwd",),
@@ -205,6 +205,7 @@ class ShellTool(BaseTool):
 
     capabilities = (ToolCapability.SHELL,)
     risk_level = ToolRisk.CONDITIONAL
+    scope = ToolScope.SHELL
 
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root).resolve()
@@ -261,7 +262,7 @@ class RunCommandTool(ShellTool):
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
 
         command = str(kwargs.get("command", ""))
@@ -274,6 +275,12 @@ class RunCommandTool(ShellTool):
                 command_prefix=tokens,
             )
         return None
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        command = str(kwargs.get("command", ""))
+        _tokens, _needs_approval, reason = _classify_command(command)
+        description = reason or "Command is considered read-only/safe under the current policy."
+        return ToolResult(output=f"Would run: {command}\n{description}", metadata={"command": command})
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         command = kwargs.get("command", "")
@@ -347,6 +354,8 @@ class StartProcessTool(ShellTool):
     }
     capabilities = (ToolCapability.SHELL, ToolCapability.PROCESS)
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    mutating = True
+    scope = ToolScope.PROCESS
 
     def __init__(self, project_root: str = ".", process_manager: ProcessManager | None = None):
         super().__init__(project_root)
@@ -355,7 +364,7 @@ class StartProcessTool(ShellTool):
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         command = str(kwargs.get("command", ""))
         tokens, _needs_approval, _reason = _classify_command(command)
@@ -365,6 +374,10 @@ class StartProcessTool(ShellTool):
             summary=command,
             command_prefix=tokens,
         )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        command = str(kwargs.get("command", ""))
+        return ToolResult(output=f"Would start an interactive process: {command}", metadata={"command": command})
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         command = kwargs.get("command", "")
@@ -413,6 +426,8 @@ class ReadProcessOutputTool(BaseTool):
         "required": ["process_id"],
     }
     capabilities = (ToolCapability.PROCESS,)
+    scope = ToolScope.PROCESS
+    cache_ttl_seconds = 0
 
     def __init__(self, process_manager: ProcessManager):
         self.process_manager = process_manager
@@ -466,6 +481,8 @@ class WriteProcessInputTool(BaseTool):
     }
     capabilities = (ToolCapability.PROCESS,)
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    scope = ToolScope.PROCESS
+    mutating = True
 
     def __init__(self, process_manager: ProcessManager):
         self.process_manager = process_manager
@@ -473,12 +490,18 @@ class WriteProcessInputTool(BaseTool):
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         return ApprovalRequest(
             tool_name=self.name,
             reason="Writing to an interactive process always requires approval.",
             summary=f"process {kwargs.get('process_id')}",
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        return ToolResult(
+            output=f"Would write to process {kwargs.get('process_id')}",
+            metadata={"process_id": kwargs.get("process_id"), "text_length": len(kwargs.get("text", ""))},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -516,6 +539,9 @@ class StopProcessTool(BaseTool):
     }
     capabilities = (ToolCapability.PROCESS,)
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    scope = ToolScope.PROCESS
+    mutating = True
+    reversible = False
 
     def __init__(self, process_manager: ProcessManager):
         self.process_manager = process_manager
@@ -523,12 +549,18 @@ class StopProcessTool(BaseTool):
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         return ApprovalRequest(
             tool_name=self.name,
             reason="Stopping an interactive process requires approval.",
             summary=f"process {kwargs.get('process_id')}",
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        return ToolResult(
+            output=f"Would stop process {kwargs.get('process_id')}",
+            metadata={"process_id": kwargs.get("process_id"), "force": kwargs.get("force", False)},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:

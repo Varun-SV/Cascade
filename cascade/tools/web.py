@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from cascade.tools.base import BaseTool, ToolCapability, ToolResult
+from cascade.tools.base import BaseTool, ToolCapability, ToolResult, ToolScope
 
 
 class FetchURLTool(BaseTool):
@@ -28,6 +28,8 @@ class FetchURLTool(BaseTool):
         "required": ["url"],
     }
     capabilities = (ToolCapability.NETWORK,)
+    scope = ToolScope.NETWORK
+    cache_ttl_seconds = 30
 
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -112,6 +114,8 @@ class WebSearchTool(BaseTool):
         "required": ["query"],
     }
     capabilities = (ToolCapability.NETWORK,)
+    scope = ToolScope.NETWORK
+    cache_ttl_seconds = 30
 
 
     async def execute(self, **kwargs: Any) -> ToolResult:

@@ -1,65 +1,88 @@
 # Cascade Configuration
-# Copy this to ~/.cascade/config.yaml or ./cascade.yaml
+# Copy this file to ./cascade.yaml or ~/.cascade/config.yaml and tailor it to your stack.
 
-# ── Dynamic Model Pool ──────────────────────────────────────────────
-# Define the models available to Cascade. The root agent will assign 
-# these models to children it spawns.
 default_planner: planner
 default_auditor: local
 
 models:
   - id: planner
-    provider: anthropic           # anthropic | openai | google | ollama
+    provider: anthropic
     model: claude-sonnet-4-20250514
     temperature: 0.3
     max_tokens: 8192
+    context_window: 200000
+    fallback_models: [worker, local]
+    benchmark_tags: [planning, coding]
 
   - id: worker
-    provider: anthropic
-    model: claude-sonnet-4-20250514
+    provider: openai
+    model: gpt-4o-mini
     temperature: 0.2
     max_tokens: 4096
+    context_window: 128000
+    fallback_models: [local]
+    benchmark_tags: [editing, testing]
 
   - id: local
     provider: ollama
-    model: qwen2.5-coder:7b       # Local SLM via Ollama
+    model: qwen2.5-coder:7b
     temperature: 0.1
-    max_tokens: 2048
+    max_tokens: 4096
+    context_window: 32768
+    benchmark_tags: [local, summarization]
 
-# ── API Keys ────────────────────────────────────────────────────────
-# Keys can also be set via environment variables:
-#   CASCADE_ANTHROPIC_API_KEY, CASCADE_OPENAI_API_KEY, CASCADE_GOOGLE_API_KEY
 api_keys:
-  anthropic: ""                   # Or set CASCADE_ANTHROPIC_API_KEY env var
-  openai: ""                      # Or set CASCADE_OPENAI_API_KEY env var
-  google: ""                      # Or set CASCADE_GOOGLE_API_KEY env var
+  anthropic: ""
+  openai: ""
+  google: ""
 
-# Ollama settings (no API key needed)
 ollama:
   base_url: "http://localhost:11434"
 
-# ── Escalation Thresholds ───────────────────────────────────────────
-# If an agent drops below this confidence or hits max retries, it gives up
-# and escalates back to its parent agent.
 escalation:
   confidence_threshold: 0.5
   max_retries: 2
 
-# ── Cost Budgets (optional) ─────────────────────────────────────────
-# Set to null or remove to disable budget tracking
 budget:
   enabled: false
-  session_max_cost: null           # Total across all models
+  session_max_cost: null
+  task_max_cost: null
+  ledger_path: "~/.cascade/state.db"
+  estimation_enabled: true
+  estimation_warn_threshold: 1.0
+  tier_max_costs: {}
+  model_max_cost: {}
 
-# ── Approvals ───────────────────────────────────────────────────────
-# Guard risky writes, git mutations, and non-read-only shell/process tools.
 approvals:
-  mode: guarded                    # guarded | power_user | strict
+  mode: guarded   # auto | guarded | strict
   allowed_command_prefixes:
     - ["pytest"]
     - ["git", "status"]
+    - ["python", "-m", "pytest"]
 
-# ── General ─────────────────────────────────────────────────────────
-project_root: "."                 # Sandbox root for file operations
+runtime:
+  max_reflections: 3
+  stream_events: true
+  preflight_confirmation: true
+  retry_reflection_enabled: true
+
+observability:
+  trace_dir: ".cascade/traces"
+  journal_path: ".cascade/journal.log"
+  otel_enabled: false
+  otel_exporter: ""
+
+plugins:
+  registry_path: "~/.cascade/plugins.json"
+  enabled_packages: []
+  auto_load: true
+  strategy: default
+
+semantic_search:
+  enabled: true
+  ollama_embedding_model: "nomic-embed-text"
+  base_url: "http://localhost:11434"
+
+project_root: "."
 verbose: false
-log_file: null                    # e.g., "~/.cascade/cascade.log"
+log_file: null

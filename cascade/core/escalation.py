@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 from cascade.config import EscalationConfig
@@ -31,7 +29,7 @@ class EscalationPolicy:
         
         Args:
             confidence: Current confidence score (0.0 to 1.0)
-            attempts: Number of times this task has been retried
+            attempts: Number of consecutive failed attempts or retries
             tools_failed: Number of consecutive tool failures
             
         Returns:
@@ -40,7 +38,7 @@ class EscalationPolicy:
         if confidence < self.config.confidence_threshold:
             return True
             
-        if attempts >= self.config.max_retries:
+        if attempts > self.config.max_retries:
             return True
             
         if tools_failed >= 3:

@@ -124,3 +124,61 @@ async def test_approval_denial_is_returned_to_model(tmp_path, config):
     tool_results = [msg.tool_result for msg in provider.message_batches[1] if msg.tool_result]
     assert tool_results
     assert "Approval denied" in tool_results[-1].content
+
+
+@pytest.mark.asyncio
+async def test_recovered_tool_failure_does_not_force_escalation(tmp_path, config):
+    config.escalation.max_retries = 1
+    registry = ToolRegistry()
+    registry.register(WriteFileTool(str(tmp_path)))
+    provider = RecordingProvider(
+        [
+            Response(
+                content="try the write",
+                tool_calls=[
+                    ToolCall(
+                        id="tool-1",
+                        name="write_file",
+                        arguments={"path": "recovered.txt", "content": "first"},
+                    )
+                ],
+            ),
+            Response(
+                content="retry the write",
+                tool_calls=[
+                    ToolCall(
+                        id="tool-2",
+                        name="write_file",
+                        arguments={"path": "recovered.txt", "content": "second"},
+                    )
+                ],
+            ),
+            Response(content="Recovered and finished successfully."),
+        ]
+    )
+
+    agent = CascadeAgent(
+        model_id="planner",
+        provider=provider,
+        config=config,
+        tool_registry=registry,
+        escalation_policy=EscalationPolicy(config.escalation),
+        allowed_tools=["write_file"],
+        provider_factory=lambda _model_id: provider,
+    )
+
+    calls = 0
+
+    async def flaky_approval(_request):
+        nonlocal calls
+        calls += 1
+        return calls > 1
+
+    success, summary, _confidence = await agent.execute_subtask(
+        SubTask(description="Write a file even after one denied attempt"),
+        on_approval_request=flaky_approval,
+    )
+
+    assert success
+    assert summary == "Recovered and finished successfully."
+    assert (tmp_path / "recovered.txt").read_text(encoding="utf-8") == "second"

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from cascade.core.approval import ApprovalMode, ApprovalRequest
-from cascade.tools.base import BaseTool, ToolCapability, ToolResult, ToolRisk
+from cascade.tools.base import BaseTool, ToolCapability, ToolResult, ToolRisk, ToolScope
 
 
 class ProjectPathTool(BaseTool):
@@ -72,6 +72,8 @@ class ReadFileTool(ProjectPathTool):
         "required": ["path"],
     }
     capabilities = (ToolCapability.READ,)
+    scope = ToolScope.FILE
+    cache_ttl_seconds = 5
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         path = kwargs.get("path", "")
@@ -128,6 +130,8 @@ class ReadFilesTool(ProjectPathTool):
         "required": ["paths"],
     }
     capabilities = (ToolCapability.READ,)
+    scope = ToolScope.FILE
+    cache_ttl_seconds = 5
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         paths = kwargs.get("paths", [])
@@ -181,16 +185,26 @@ class WriteFileTool(ProjectPathTool):
     }
     capabilities = (ToolCapability.WRITE,)
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    scope = ToolScope.FILE
+    mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         return ApprovalRequest(
             tool_name=self.name,
             reason="Writing files mutates the repository.",
             summary=str(kwargs.get("path", "")),
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        path = kwargs.get("path", "")
+        content = kwargs.get("content", "")
+        return ToolResult(
+            output=f"Would write {len(content)} characters to {path}",
+            metadata={"path": path, "size": len(content)},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -236,16 +250,24 @@ class EditFileTool(ProjectPathTool):
     }
     capabilities = (ToolCapability.WRITE,)
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    scope = ToolScope.FILE
+    mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         return ApprovalRequest(
             tool_name=self.name,
             reason="Editing files mutates the repository.",
             summary=str(kwargs.get("path", "")),
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        return ToolResult(
+            output=f"Would edit {kwargs.get('path', '')} by replacing a specific target string.",
+            metadata={"path": kwargs.get("path", "")},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -304,16 +326,27 @@ class SearchReplaceTool(ProjectPathTool):
     }
     capabilities = (ToolCapability.WRITE,)
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    scope = ToolScope.FILE
+    mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         return ApprovalRequest(
             tool_name=self.name,
             reason="Search-and-replace mutates file contents.",
             summary=str(kwargs.get("path", "")),
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        path = kwargs.get("path", "")
+        search = kwargs.get("search", "")
+        replacement = kwargs.get("replacement", "")
+        return ToolResult(
+            output=f"Would replace occurrences of {search!r} with {replacement!r} in {path}",
+            metadata={"path": path},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -443,16 +476,26 @@ class ApplyPatchTool(ProjectPathTool):
     }
     capabilities = (ToolCapability.WRITE,)
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    scope = ToolScope.FILE
+    mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         return ApprovalRequest(
             tool_name=self.name,
             reason="Applying a patch can mutate multiple files at once.",
             summary="apply_patch",
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        patch_text = kwargs.get("patch", "")
+        touched = patch_text.count("\n--- ")
+        return ToolResult(
+            output=f"Would apply a patch touching approximately {max(touched, 1)} file(s).",
+            metadata={"touched_files_estimate": max(touched, 1)},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -639,16 +682,24 @@ class MovePathTool(ProjectPathTool):
     }
     capabilities = (ToolCapability.WRITE,)
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    scope = ToolScope.FILE
+    mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         return ApprovalRequest(
             tool_name=self.name,
             reason="Moving files mutates the repository layout.",
             summary=f"{kwargs.get('source', '')} -> {kwargs.get('destination', '')}",
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        return ToolResult(
+            output=f"Would move {kwargs.get('source', '')} -> {kwargs.get('destination', '')}",
+            metadata={"source": kwargs.get("source", ""), "destination": kwargs.get("destination", "")},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -693,16 +744,25 @@ class DeletePathTool(ProjectPathTool):
     }
     capabilities = (ToolCapability.WRITE,)
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    scope = ToolScope.FILE
+    mutating = True
+    reversible = False
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         return ApprovalRequest(
             tool_name=self.name,
             reason="Deleting files is destructive.",
             summary=str(kwargs.get("path", "")),
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        return ToolResult(
+            output=f"Would delete {kwargs.get('path', '')}",
+            metadata={"path": kwargs.get("path", "")},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -746,6 +806,8 @@ class ListDirectoryTool(ProjectPathTool):
         "required": [],
     }
     capabilities = (ToolCapability.READ,)
+    scope = ToolScope.FILE
+    cache_ttl_seconds = 5
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         path = kwargs.get("path", ".") or "."
@@ -817,6 +879,8 @@ class GlobFilesTool(ProjectPathTool):
         "required": ["pattern"],
     }
     capabilities = (ToolCapability.READ,)
+    scope = ToolScope.FILE
+    cache_ttl_seconds = 5
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         pattern = kwargs.get("pattern", "")
@@ -871,6 +935,8 @@ class FindFilesTool(ProjectPathTool):
         "required": ["pattern"],
     }
     capabilities = (ToolCapability.READ,)
+    scope = ToolScope.FILE
+    cache_ttl_seconds = 5
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         pattern = kwargs.get("pattern", "")

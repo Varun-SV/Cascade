@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from cascade.core.approval import ApprovalMode, ApprovalRequest
-from cascade.tools.base import BaseTool, ToolCapability, ToolResult, ToolRisk
+from cascade.tools.base import BaseTool, ToolCapability, ToolResult, ToolRisk, ToolScope
 
 
 def _truncate(text: str, max_chars: int = 10000) -> str:
@@ -19,6 +19,8 @@ class GitTool(BaseTool):
     """Shared git helpers."""
 
     capabilities = (ToolCapability.GIT,)
+    scope = ToolScope.GIT
+    cache_ttl_seconds = 5
 
     def __init__(self, project_root: str = "."):
         self.project_root = str(Path(project_root).resolve())
@@ -225,11 +227,12 @@ class GitAddTool(GitTool):
         "required": [],
     }
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         files = kwargs.get("files") or ["-A"]
         return ApprovalRequest(
@@ -237,6 +240,10 @@ class GitAddTool(GitTool):
             reason="Staging files mutates the git index.",
             summary=" ".join(files),
         )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        files = kwargs.get("files") or ["all tracked changes"]
+        return ToolResult(output=f"Would stage: {', '.join(files)}", metadata={"files": files})
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         files = kwargs.get("files", [])
@@ -272,16 +279,23 @@ class GitCommitTool(GitTool):
         "required": ["message"],
     }
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         return ApprovalRequest(
             tool_name=self.name,
             reason="Creating a git commit mutates repository history.",
             summary=str(kwargs.get("message", "")),
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        return ToolResult(
+            output=f"Would create a git commit with message: {kwargs.get('message', '')}",
+            metadata={"message": kwargs.get("message", ""), "files": kwargs.get("files", [])},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -325,17 +339,26 @@ class GitCheckoutTool(GitTool):
         "required": ["ref"],
     }
     risk_level = ToolRisk.APPROVAL_REQUIRED
+    mutating = True
+    reversible = False
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode == ApprovalMode.POWER_USER:
+        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
             return None
         ref = kwargs.get("ref", "")
         return ApprovalRequest(
             tool_name=self.name,
             reason="Checking out a ref changes HEAD and may affect the working tree.",
             summary=str(ref),
+        )
+
+    async def dry_run(self, **kwargs: Any) -> ToolResult:
+        action = "create and check out" if kwargs.get("create_branch", False) else "check out"
+        return ToolResult(
+            output=f"Would {action} {kwargs.get('ref', '')}",
+            metadata={"ref": kwargs.get("ref", ""), "create_branch": kwargs.get("create_branch", False)},
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:

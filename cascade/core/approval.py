@@ -12,9 +12,10 @@ from pydantic import BaseModel, Field
 class ApprovalMode(str, Enum):
     """Supported approval strategies."""
 
+    AUTO = "auto"
     GUARDED = "guarded"
-    POWER_USER = "power_user"
     STRICT = "strict"
+    POWER_USER = "power_user"
 
 
 class ApprovalRequest(BaseModel):

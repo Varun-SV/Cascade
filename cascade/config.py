@@ -21,6 +21,9 @@ class ModelConfig(BaseModel):
     model: str = "claude-sonnet-4-20250514"
     temperature: float = 0.2
     max_tokens: int = 4096
+    context_window: Optional[int] = None
+    fallback_models: list[str] = Field(default_factory=list)
+    benchmark_tags: list[str] = Field(default_factory=list)
 
 
 class APIKeysConfig(BaseModel):
@@ -49,6 +52,11 @@ class BudgetConfig(BaseModel):
 
     enabled: bool = False
     session_max_cost: Optional[float] = None
+    task_max_cost: Optional[float] = None
+    ledger_path: str = "~/.cascade/state.db"
+    estimation_enabled: bool = True
+    estimation_warn_threshold: float = 1.0
+    tier_max_costs: dict[str, float] = Field(default_factory=dict)
     model_max_cost: dict[str, float] = Field(default_factory=dict)
 
 
@@ -57,6 +65,13 @@ class ApprovalsConfig(BaseModel):
 
     mode: ApprovalMode = ApprovalMode.GUARDED
     allowed_command_prefixes: list[list[str]] = Field(default_factory=list)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _normalize_mode(cls, value: Any) -> str:
+        if value == "power_user":
+            return "auto"
+        return value
 
     @field_validator("allowed_command_prefixes", mode="before")
     @classmethod
@@ -112,6 +127,10 @@ class CascadeConfig(BaseModel):
     escalation: EscalationConfig = Field(default_factory=EscalationConfig)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     approvals: ApprovalsConfig = Field(default_factory=ApprovalsConfig)
+    runtime: "RuntimeConfig" = Field(default_factory=lambda: RuntimeConfig())
+    observability: "ObservabilityConfig" = Field(default_factory=lambda: ObservabilityConfig())
+    plugins: "PluginConfig" = Field(default_factory=lambda: PluginConfig())
+    semantic_search: "SemanticSearchConfig" = Field(default_factory=lambda: SemanticSearchConfig())
     project_root: str = "."
     verbose: bool = False
     log_file: Optional[str] = None
@@ -129,6 +148,41 @@ def _resolve_api_key(config_value: str, env_var: str) -> str:
     if config_value:
         return config_value
     return os.environ.get(env_var, "")
+
+
+class RuntimeConfig(BaseModel):
+    """Runtime behavior for retries, reflection, and streaming."""
+
+    max_reflections: int = 3
+    stream_events: bool = True
+    preflight_confirmation: bool = True
+    retry_reflection_enabled: bool = True
+
+
+class ObservabilityConfig(BaseModel):
+    """Trace, journal, and telemetry settings."""
+
+    trace_dir: str = ".cascade/traces"
+    journal_path: str = ".cascade/journal.log"
+    otel_enabled: bool = False
+    otel_exporter: str = ""
+
+
+class PluginConfig(BaseModel):
+    """Plugin loading and strategy selection."""
+
+    registry_path: str = "~/.cascade/plugins.json"
+    enabled_packages: list[str] = Field(default_factory=list)
+    auto_load: bool = True
+    strategy: str = "default"
+
+
+class SemanticSearchConfig(BaseModel):
+    """Semantic search backend settings."""
+
+    enabled: bool = True
+    ollama_embedding_model: str = "nomic-embed-text"
+    base_url: str = "http://localhost:11434"
 
 
 def load_config(config_path: Optional[str] = None) -> CascadeConfig:
