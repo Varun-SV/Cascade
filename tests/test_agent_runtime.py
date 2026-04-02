@@ -83,6 +83,11 @@ async def test_root_agent_gets_discovery_tools(tmp_path, config):
 
 @pytest.mark.asyncio
 async def test_approval_denial_is_returned_to_model(tmp_path, config):
+    # Use STRICT mode so write_file requires approval
+    from cascade.core.approval import ApprovalMode
+    from cascade.config import ApprovalsConfig
+    config.approvals = ApprovalsConfig(mode=ApprovalMode.STRICT)
+
     registry = ToolRegistry()
     registry.register(WriteFileTool(str(tmp_path)))
     provider = RecordingProvider(

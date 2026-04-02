@@ -93,6 +93,7 @@ async def test_repo_mutating_file_tool_requires_approval(tmp_path):
     registry = ToolRegistry()
     registry.register(WriteFileTool(str(tmp_path)))
 
+    # In GUARDED mode, write_file should auto-execute (no approval needed)
     result = await registry.execute(
         "write_file",
         allowed_names=["all"],
@@ -100,6 +101,15 @@ async def test_repo_mutating_file_tool_requires_approval(tmp_path):
         content="hi",
         approval_mode=ApprovalMode.GUARDED,
     )
+    assert result.success
 
+    # In STRICT mode, write_file should still require approval
+    result = await registry.execute(
+        "write_file",
+        allowed_names=["all"],
+        path="hello2.txt",
+        content="hi",
+        approval_mode=ApprovalMode.STRICT,
+    )
     assert not result.success
     assert "approval denied" in result.error.lower()

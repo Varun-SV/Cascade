@@ -184,20 +184,20 @@ class WriteFileTool(ProjectPathTool):
         "required": ["path", "content"],
     }
     capabilities = (ToolCapability.WRITE,)
-    risk_level = ToolRisk.APPROVAL_REQUIRED
+    risk_level = ToolRisk.CONDITIONAL
     scope = ToolScope.FILE
     mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
-            return None
-        return ApprovalRequest(
-            tool_name=self.name,
-            reason="Writing files mutates the repository.",
-            summary=str(kwargs.get("path", "")),
-        )
+        if approval_mode == ApprovalMode.STRICT:
+            return ApprovalRequest(
+                tool_name=self.name,
+                reason="Writing files mutates the repository.",
+                summary=str(kwargs.get("path", "")),
+            )
+        return None
 
     async def dry_run(self, **kwargs: Any) -> ToolResult:
         path = kwargs.get("path", "")
@@ -249,20 +249,20 @@ class EditFileTool(ProjectPathTool):
         "required": ["path", "target", "replacement"],
     }
     capabilities = (ToolCapability.WRITE,)
-    risk_level = ToolRisk.APPROVAL_REQUIRED
+    risk_level = ToolRisk.CONDITIONAL
     scope = ToolScope.FILE
     mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
-            return None
-        return ApprovalRequest(
-            tool_name=self.name,
-            reason="Editing files mutates the repository.",
-            summary=str(kwargs.get("path", "")),
-        )
+        if approval_mode == ApprovalMode.STRICT:
+            return ApprovalRequest(
+                tool_name=self.name,
+                reason="Editing files mutates the repository.",
+                summary=str(kwargs.get("path", "")),
+            )
+        return None
 
     async def dry_run(self, **kwargs: Any) -> ToolResult:
         return ToolResult(
@@ -325,20 +325,20 @@ class SearchReplaceTool(ProjectPathTool):
         "required": ["path", "search", "replacement"],
     }
     capabilities = (ToolCapability.WRITE,)
-    risk_level = ToolRisk.APPROVAL_REQUIRED
+    risk_level = ToolRisk.CONDITIONAL
     scope = ToolScope.FILE
     mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
-            return None
-        return ApprovalRequest(
-            tool_name=self.name,
-            reason="Search-and-replace mutates file contents.",
-            summary=str(kwargs.get("path", "")),
-        )
+        if approval_mode == ApprovalMode.STRICT:
+            return ApprovalRequest(
+                tool_name=self.name,
+                reason="Search-and-replace mutates file contents.",
+                summary=str(kwargs.get("path", "")),
+            )
+        return None
 
     async def dry_run(self, **kwargs: Any) -> ToolResult:
         path = kwargs.get("path", "")
@@ -475,20 +475,20 @@ class ApplyPatchTool(ProjectPathTool):
         "required": ["patch"],
     }
     capabilities = (ToolCapability.WRITE,)
-    risk_level = ToolRisk.APPROVAL_REQUIRED
+    risk_level = ToolRisk.CONDITIONAL
     scope = ToolScope.FILE
     mutating = True
 
     def requires_approval(
         self, approval_mode: ApprovalMode, **kwargs: Any
     ) -> ApprovalRequest | None:
-        if approval_mode in {ApprovalMode.AUTO, ApprovalMode.POWER_USER}:
-            return None
-        return ApprovalRequest(
-            tool_name=self.name,
-            reason="Applying a patch can mutate multiple files at once.",
-            summary="apply_patch",
-        )
+        if approval_mode == ApprovalMode.STRICT:
+            return ApprovalRequest(
+                tool_name=self.name,
+                reason="Applying a patch can mutate multiple files at once.",
+                summary="apply_patch",
+            )
+        return None
 
     async def dry_run(self, **kwargs: Any) -> ToolResult:
         patch_text = kwargs.get("patch", "")

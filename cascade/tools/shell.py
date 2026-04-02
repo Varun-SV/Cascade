@@ -13,6 +13,7 @@ from cascade.core.approval import ApprovalMode, ApprovalRequest
 from cascade.tools.base import BaseTool, ToolCapability, ToolResult, ToolRisk, ToolScope
 
 SAFE_COMMAND_PREFIXES = [
+    # Read-only / inspection
     ("pwd",),
     ("ls",),
     ("cat",),
@@ -29,23 +30,55 @@ SAFE_COMMAND_PREFIXES = [
     ("cut",),
     ("stat",),
     ("which",),
+    ("echo",),
+    ("env",),
+    ("printenv",),
+    ("tree",),
+    ("file",),
+    ("du",),
+    ("df",),
+    # File creation (non-destructive)
+    ("mkdir",),
+    ("touch",),
+    ("cp",),
+    # Git (read-only)
     ("git", "status"),
     ("git", "diff"),
     ("git", "log"),
     ("git", "show"),
+    ("git", "branch"),
+    ("git", "remote"),
+    ("git", "tag"),
+    # Python
+    ("python",),
+    ("python3",),
+    ("pip",),
+    ("pip3",),
     ("pytest",),
-    ("python", "-m", "pytest"),
-    ("python3", "-m", "pytest"),
-    ("ruff", "check"),
-    ("npm", "test"),
-    ("npm", "run", "test"),
-    ("pnpm", "test"),
-    ("pnpm", "run", "test"),
-    ("yarn", "test"),
-    ("cargo", "test"),
-    ("go", "test"),
-    ("mvn", "test"),
-    ("gradle", "test"),
+    ("ruff",),
+    ("black",),
+    ("mypy",),
+    ("flake8",),
+    ("uvicorn",),
+    # Node / JS
+    ("node",),
+    ("npm",),
+    ("npx",),
+    ("pnpm",),
+    ("yarn",),
+    ("bun",),
+    # Build tools
+    ("cargo",),
+    ("go",),
+    ("mvn",),
+    ("gradle",),
+    ("make",),
+    ("cmake",),
+    # Common utilities
+    ("curl",),
+    ("wget",),
+    ("jq",),
+    ("xargs",),
 ]
 
 SHELL_META_CHARS = {"|", "&", ";", ">", "<", "$", "`", "(", ")"}
