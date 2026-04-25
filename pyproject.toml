@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=68.0,<77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -77,6 +77,9 @@ Homepage = "https://github.com/varunsv/cascade-ai"
 
 [tool.setuptools.packages.find]
 include = ["cascade*"]
+
+[tool.setuptools.package-data]
+"cascade.tui.themes" = ["*.tcss"]
 
 [tool.ruff]
 line-length = 100
