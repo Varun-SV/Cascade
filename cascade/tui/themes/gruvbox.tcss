@@ -1,0 +1,31 @@
+/* Gruvbox Dark theme */
+
+$bg-base: #282828;
+$bg-panel: #3c3836;
+$bg-input: #1d2021;
+$bg-elevated: #504945;
+$accent: #b8bb26;
+$accent-dim: #6e7010;
+$accent-bright: #fabd2f;
+$text-primary: #ebdbb2;
+$text-dim: #665c54;
+$text-muted: #928374;
+$text-user: #83a598;
+$text-ai: #ebdbb2;
+$success: #b8bb26;
+$warning: #fabd2f;
+$error: #fb4934;
+$tool-border: #504945;
+$tool-bg: #1d2021;
+$terminal-text: #b8bb26;
+$terminal-bg: #181818;
+$thinking-text: #928374;
+$auditor-bg: #2a1010;
+$auditor-border: #cc241d;
+$scrollbar: #504945;
+$scrollbar-hover: #b8bb26;
+
+Screen {
+    background: $bg-base;
+    color: $text-primary;
+}

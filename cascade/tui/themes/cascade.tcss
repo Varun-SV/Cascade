@@ -1,0 +1,31 @@
+/* Cascade default dark theme */
+
+$bg-base: #0f1117;
+$bg-panel: #1a1d27;
+$bg-input: #0d0f16;
+$bg-elevated: #21273a;
+$accent: #4a9eff;
+$accent-dim: #1e4a80;
+$accent-bright: #74b9ff;
+$text-primary: #e4e6f0;
+$text-dim: #5a6070;
+$text-muted: #8890a0;
+$text-user: #74b9ff;
+$text-ai: #e4e6f0;
+$success: #4ade80;
+$warning: #fbbf24;
+$error: #f87171;
+$tool-border: #2a3050;
+$tool-bg: #12151e;
+$terminal-text: #86efac;
+$terminal-bg: #0a0d12;
+$thinking-text: #6272a4;
+$auditor-bg: #2a1010;
+$auditor-border: #7f1d1d;
+$scrollbar: #2a3050;
+$scrollbar-hover: #4a9eff;
+
+Screen {
+    background: $bg-base;
+    color: $text-primary;
+}

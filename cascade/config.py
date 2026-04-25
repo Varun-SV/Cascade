@@ -24,6 +24,8 @@ class ModelConfig(BaseModel):
     context_window: Optional[int] = None
     fallback_models: list[str] = Field(default_factory=list)
     benchmark_tags: list[str] = Field(default_factory=list)
+    # For provider="azure": references an entry in CascadeConfig.azure_endpoints by name
+    azure_endpoint: Optional[str] = None
 
 
 class APIKeysConfig(BaseModel):
@@ -38,6 +40,16 @@ class OllamaConfig(BaseModel):
     """Ollama-specific settings."""
 
     base_url: str = "http://localhost:11434"
+
+
+class AzureEndpointConfig(BaseModel):
+    """A single Azure OpenAI endpoint (one resource can have many deployments)."""
+
+    name: str
+    base_url: str
+    api_key: str = ""
+    api_version: str = "2024-02-01"
+    deployment_name: str = ""
 
 
 class EscalationConfig(BaseModel):
@@ -124,6 +136,7 @@ class CascadeConfig(BaseModel):
     
     api_keys: APIKeysConfig = Field(default_factory=APIKeysConfig)
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
+    azure_endpoints: list[AzureEndpointConfig] = Field(default_factory=list)
     escalation: EscalationConfig = Field(default_factory=EscalationConfig)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     approvals: ApprovalsConfig = Field(default_factory=ApprovalsConfig)
@@ -226,5 +239,10 @@ def load_config(config_path: Optional[str] = None) -> CascadeConfig:
     config.api_keys.google = _resolve_api_key(
         config.api_keys.google, "CASCADE_GOOGLE_API_KEY"
     )
+
+    # Resolve Azure endpoint API keys from environment variables
+    for ep in config.azure_endpoints:
+        env_var = f"CASCADE_AZURE_{ep.name.upper().replace('-', '_')}_API_KEY"
+        ep.api_key = _resolve_api_key(ep.api_key, env_var)
 
     return config

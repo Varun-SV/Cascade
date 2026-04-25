@@ -24,13 +24,16 @@ app = typer.Typer(
     name="cascade",
     help=(
         "Cascade: reliable multi-model software engineering agents.\n\n"
+        "Run bare 'cascade' to open the interactive TUI chat.\n\n"
         "Examples:\n"
+        "  cascade\n"
         "  cascade run \"add tests for auth.py\"\n"
         "  cascade explain \"refactor the budget tracker\"\n"
         "  cascade trace <task-id>\n"
     ),
     add_completion=False,
     pretty_exceptions_show_locals=False,
+    invoke_without_command=True,
 )
 plugin_app = typer.Typer(
     name="plugin",
@@ -44,6 +47,42 @@ plugin_app = typer.Typer(
 )
 app.add_typer(plugin_app, name="plugin")
 console = Console()
+
+
+@app.callback(invoke_without_command=True)
+def main_callback(
+    ctx: typer.Context,
+    config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to cascade.yaml."),
+    project_root: Optional[str] = typer.Option(None, "--root", "-r", help="Project root."),
+    budget: Optional[float] = typer.Option(None, "--budget", "-b", help="Max session cost."),
+    approval_mode: Optional[str] = typer.Option(None, "--approval-mode", help="Approval mode."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose logs."),
+    no_auditor: bool = typer.Option(False, "--no-auditor", help="Disable Sentinel Auditor."),
+) -> None:
+    """Launch the interactive TUI chat when no subcommand is given."""
+    if ctx.invoked_subcommand is not None:
+        return
+
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        console.print(
+            "[yellow]Cascade: not a TTY — use 'cascade run <task>' for non-interactive mode.[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    try:
+        from cascade.tui.app import CascadeTUIApp
+    except ImportError as exc:
+        console.print(f"[red]TUI unavailable: {exc}[/red]")
+        raise typer.Exit(1)
+
+    CascadeTUIApp(
+        config_path=config,
+        project_root=project_root,
+        budget=budget,
+        approval_mode=approval_mode,
+        verbose=verbose,
+        no_auditor=no_auditor,
+    ).run()
 
 
 def _build_cli_approval_handler() -> Any:
@@ -303,6 +342,14 @@ def doctor(
       cascade doctor
       cascade doctor --config ./cascade.yaml --output json
     """
+    if output == "text" and sys.stdin.isatty() and sys.stdout.isatty():
+        try:
+            from cascade.tui.screens.doctor import DoctorApp
+            DoctorApp(config_path=config).run()
+            return
+        except ImportError:
+            pass
+
     from cascade.config import load_config
 
     cfg = load_config(config)
@@ -586,6 +633,14 @@ def init(
     """
     import shutil
 
+    if output == "text" and sys.stdin.isatty() and sys.stdout.isatty():
+        try:
+            from cascade.tui.screens.init_wizard import InitWizardApp
+            InitWizardApp(target_path=path, global_config=global_config).run()
+            return
+        except ImportError:
+            pass
+
     if global_config:
         cascade_dir = Path.home() / ".cascade"
         cascade_dir.mkdir(parents=True, exist_ok=True)
@@ -606,45 +661,6 @@ def init(
         _emit_json({"created": str(target)})
         return
     console.print(f"[green]Created {target}[/green]")
-
-
-@app.command()
-def chat(
-    config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to cascade.yaml."),
-    project_root: Optional[str] = typer.Option(None, "--root", "-r", help="Project root directory."),
-    budget: Optional[float] = typer.Option(None, "--budget", "-b", help="Max session cost in dollars."),
-    approval_mode: Optional[str] = typer.Option(None, "--approval-mode", help="Approval mode override."),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose logs."),
-    no_auditor: bool = typer.Option(False, "--no-auditor", help="Disable the Sentinel Auditor."),
-) -> None:
-    """Start an interactive chat loop.
-
-    Examples:
-      cascade chat
-      cascade chat --root ./myproject
-    """
-    from cascade.utils.display import print_banner, print_cost_summary, print_result
-
-    agent = _create_cascade(
-        config_path=config,
-        project_root=project_root,
-        budget=budget,
-        approval_mode=approval_mode,
-        verbose=verbose,
-        no_auditor=no_auditor,
-    )
-    _wire_text_callbacks(agent)
-
-    print_banner()
-    console.print("[bold green]Interactive mode. Type 'exit' or 'quit' to stop.[/bold green]\n")
-
-    while True:
-        prompt = Prompt.ask("[bold cyan]You[/bold cyan]")
-        if prompt.strip().lower() in {"exit", "quit"}:
-            break
-        result = asyncio.run(agent.run_async(prompt))
-        print_result(result.success, result.summary)
-        print_cost_summary(agent.cost_tracker.get_summary())
 
 
 @plugin_app.command("list")

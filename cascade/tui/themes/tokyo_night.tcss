@@ -1,0 +1,31 @@
+/* Tokyo Night theme */
+
+$bg-base: #1a1b26;
+$bg-panel: #24283b;
+$bg-input: #13141f;
+$bg-elevated: #414868;
+$accent: #7aa2f7;
+$accent-dim: #364f8a;
+$accent-bright: #bb9af7;
+$text-primary: #c0caf5;
+$text-dim: #3d59a1;
+$text-muted: #565f89;
+$text-user: #7dcfff;
+$text-ai: #c0caf5;
+$success: #9ece6a;
+$warning: #e0af68;
+$error: #f7768e;
+$tool-border: #414868;
+$tool-bg: #13141f;
+$terminal-text: #9ece6a;
+$terminal-bg: #0d0e17;
+$thinking-text: #565f89;
+$auditor-bg: #21141a;
+$auditor-border: #f7768e;
+$scrollbar: #414868;
+$scrollbar-hover: #7aa2f7;
+
+Screen {
+    background: $bg-base;
+    color: $text-primary;
+}

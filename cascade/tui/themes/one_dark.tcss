@@ -1,0 +1,31 @@
+/* One Dark theme */
+
+$bg-base: #282c34;
+$bg-panel: #2c313a;
+$bg-input: #21252b;
+$bg-elevated: #3e4451;
+$accent: #61afef;
+$accent-dim: #2a5a8a;
+$accent-bright: #56b6c2;
+$text-primary: #abb2bf;
+$text-dim: #4b5263;
+$text-muted: #5c6370;
+$text-user: #61afef;
+$text-ai: #abb2bf;
+$success: #98c379;
+$warning: #e5c07b;
+$error: #e06c75;
+$tool-border: #3e4451;
+$tool-bg: #1e2127;
+$terminal-text: #98c379;
+$terminal-bg: #181a1f;
+$thinking-text: #5c6370;
+$auditor-bg: #2d1416;
+$auditor-border: #e06c75;
+$scrollbar: #3e4451;
+$scrollbar-hover: #61afef;
+
+Screen {
+    background: $bg-base;
+    color: $text-primary;
+}
