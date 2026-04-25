@@ -6,7 +6,7 @@ The format is based on Keep a Changelog, and this project aims to follow Semanti
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-04-25
+## [1.1.0] - 2026-04-25
 
 ### Added
 - **Full-screen Textual TUI** — running bare `cascade` now launches a polished interactive chat
@@ -48,7 +48,7 @@ The format is based on Keep a Changelog, and this project aims to follow Semanti
 - Non-TTY detection for bare `cascade` invocations — pipes and scripts get a clear error
   message directing them to `cascade run <task>` instead of attempting to launch the TUI.
 
-## [0.1.0] - 2025-01-01
+## [1.0.0] - 2026-03-23
 
 ### Added
 - Initial public release of Cascade as a multi-tier AI agent orchestration system.

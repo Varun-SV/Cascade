@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cascade-ai"
-version = "0.2.0"
+version = "1.1.0"
 description = "Multi-tier AI agent orchestration — tasks cascade from large models to small ones."
 readme = "README.md"
 license = {file = "LICENSE"}
