@@ -1,0 +1,31 @@
+/* Dracula theme */
+
+$bg-base: #282a36;
+$bg-panel: #343746;
+$bg-input: #21222c;
+$bg-elevated: #44475a;
+$accent: #bd93f9;
+$accent-dim: #6e4f9a;
+$accent-bright: #ff79c6;
+$text-primary: #f8f8f2;
+$text-dim: #6272a4;
+$text-muted: #8892b0;
+$text-user: #8be9fd;
+$text-ai: #f8f8f2;
+$success: #50fa7b;
+$warning: #ffb86c;
+$error: #ff5555;
+$tool-border: #44475a;
+$tool-bg: #1e1f29;
+$terminal-text: #50fa7b;
+$terminal-bg: #1a1b23;
+$thinking-text: #6272a4;
+$auditor-bg: #2d1111;
+$auditor-border: #ff5555;
+$scrollbar: #44475a;
+$scrollbar-hover: #bd93f9;
+
+Screen {
+    background: $bg-base;
+    color: $text-primary;
+}

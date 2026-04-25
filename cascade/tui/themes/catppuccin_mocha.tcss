@@ -1,0 +1,31 @@
+/* Catppuccin Mocha theme */
+
+$bg-base: #1e1e2e;
+$bg-panel: #313244;
+$bg-input: #181825;
+$bg-elevated: #45475a;
+$accent: #89b4fa;
+$accent-dim: #4a6fa8;
+$accent-bright: #b4befe;
+$text-primary: #cdd6f4;
+$text-dim: #585b70;
+$text-muted: #7f849c;
+$text-user: #89dceb;
+$text-ai: #cdd6f4;
+$success: #a6e3a1;
+$warning: #fab387;
+$error: #f38ba8;
+$tool-border: #45475a;
+$tool-bg: #181825;
+$terminal-text: #a6e3a1;
+$terminal-bg: #11111b;
+$thinking-text: #7f849c;
+$auditor-bg: #2a1520;
+$auditor-border: #f38ba8;
+$scrollbar: #45475a;
+$scrollbar-hover: #89b4fa;
+
+Screen {
+    background: $bg-base;
+    color: $text-primary;
+}

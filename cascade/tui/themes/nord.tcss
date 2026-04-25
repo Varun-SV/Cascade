@@ -1,0 +1,31 @@
+/* Nord theme */
+
+$bg-base: #2e3440;
+$bg-panel: #3b4252;
+$bg-input: #242933;
+$bg-elevated: #434c5e;
+$accent: #88c0d0;
+$accent-dim: #4c7a8a;
+$accent-bright: #8fbcbb;
+$text-primary: #eceff4;
+$text-dim: #616e88;
+$text-muted: #9099aa;
+$text-user: #88c0d0;
+$text-ai: #eceff4;
+$success: #a3be8c;
+$warning: #ebcb8b;
+$error: #bf616a;
+$tool-border: #4c566a;
+$tool-bg: #272c36;
+$terminal-text: #a3be8c;
+$terminal-bg: #242933;
+$thinking-text: #81a1c1;
+$auditor-bg: #2d1f1f;
+$auditor-border: #bf616a;
+$scrollbar: #4c566a;
+$scrollbar-hover: #88c0d0;
+
+Screen {
+    background: $bg-base;
+    color: $text-primary;
+}

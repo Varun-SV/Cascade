@@ -112,6 +112,26 @@ def _create_raw_provider(model_config: ModelConfig, config: CascadeConfig) -> Ba
             model=model_config.model,
             base_url=config.ollama.base_url,
         )
+    if provider_name == "azure":
+        from cascade.providers.azure_provider import create_azure_provider
+
+        endpoint_name = model_config.azure_endpoint
+        endpoint = next(
+            (ep for ep in config.azure_endpoints if ep.name == endpoint_name),
+            None,
+        )
+        if endpoint is None:
+            raise ValueError(
+                f"Azure endpoint '{endpoint_name}' not found in azure_endpoints config. "
+                "Add it under the azure_endpoints: key in cascade.yaml."
+            )
+        return create_azure_provider(
+            api_key=endpoint.api_key,
+            base_url=endpoint.base_url,
+            api_version=endpoint.api_version,
+            deployment_name=endpoint.deployment_name,
+            model=model_config.model,
+        )
 
     raise ValueError(f"Unknown provider: {provider_name}")
 

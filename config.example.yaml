@@ -32,12 +32,37 @@ models:
     benchmark_tags: [local, summarization]
 
 api_keys:
-  anthropic: ""
-  openai: ""
-  google: ""
+  anthropic: ""    # or set CASCADE_ANTHROPIC_API_KEY env var
+  openai: ""       # or set CASCADE_OPENAI_API_KEY env var
+  google: ""       # or set CASCADE_GOOGLE_API_KEY env var
 
 ollama:
   base_url: "http://localhost:11434"
+
+# Azure OpenAI: multiple endpoints, each with its own resource + deployment.
+# Each entry can reference a different Azure resource or deployment.
+# Set api_key here or via CASCADE_AZURE_<NAME>_API_KEY environment variable.
+#
+# azure_endpoints:
+#   - name: eastus-gpt4o
+#     base_url: "https://my-resource.openai.azure.com"
+#     api_key: ""    # or CASCADE_AZURE_EASTUS_GPT4O_API_KEY
+#     api_version: "2024-02-01"
+#     deployment_name: "gpt-4o"
+#
+#   - name: westus-gpt4o-mini
+#     base_url: "https://my-resource-2.openai.azure.com"
+#     api_key: ""    # or CASCADE_AZURE_WESTUS_GPT4O_MINI_API_KEY
+#     api_version: "2024-08-01-preview"
+#     deployment_name: "gpt-4o-mini"
+#
+# Then reference an endpoint in a model entry:
+#   - id: azure-worker
+#     provider: azure
+#     azure_endpoint: eastus-gpt4o
+#     model: gpt-4o          # used for pricing lookup only
+#     temperature: 0.2
+#     max_tokens: 4096
 
 escalation:
   confidence_threshold: 0.5
