@@ -132,8 +132,8 @@ class ManagedProcess:
     stderr: str = ""
     stdout_offset: int = 0
     stderr_offset: int = 0
-    stdout_task: asyncio.Task | None = None
-    stderr_task: asyncio.Task | None = None
+    stdout_task: asyncio.Task[None] | None = None
+    stderr_task: asyncio.Task[None] | None = None
 
     def append_stdout(self, chunk: str) -> None:
         self.stdout = _trim_buffer(self.stdout + chunk, self.max_buffer_chars, "stdout_offset", self)
@@ -236,7 +236,7 @@ class ProcessManager:
 class ShellTool(BaseTool):
     """Base class for command-executing tools."""
 
-    capabilities = (ToolCapability.SHELL,)
+    capabilities: tuple[ToolCapability, ...] = (ToolCapability.SHELL,)
     risk_level = ToolRisk.CONDITIONAL
     scope = ToolScope.SHELL
 
@@ -466,7 +466,7 @@ class ReadProcessOutputTool(BaseTool):
         self.process_manager = process_manager
 
     async def execute(self, **kwargs: Any) -> ToolResult:
-        process_id = kwargs.get("process_id")
+        process_id: int = kwargs.get("process_id", 0)
         since_last_read = kwargs.get("since_last_read", True)
         max_chars = kwargs.get("max_chars", 4000)
 
@@ -538,7 +538,7 @@ class WriteProcessInputTool(BaseTool):
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
-        process_id = kwargs.get("process_id")
+        process_id: int = kwargs.get("process_id", 0)
         text = kwargs.get("text", "")
         append_newline = kwargs.get("append_newline", False)
 
@@ -597,7 +597,7 @@ class StopProcessTool(BaseTool):
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
-        process_id = kwargs.get("process_id")
+        process_id: int = kwargs.get("process_id", 0)
         force = kwargs.get("force", False)
 
         try:

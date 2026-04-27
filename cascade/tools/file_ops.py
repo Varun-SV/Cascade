@@ -847,7 +847,7 @@ class ListDirectoryTool(ProjectPathTool):
                 entries.append(f"{indent}📄 {rel} ({self._format_size(item.stat().st_size)})")
 
     @staticmethod
-    def _format_size(size: int) -> str:
+    def _format_size(size: float) -> str:
         for unit in ["B", "KB", "MB", "GB"]:
             if size < 1024:
                 return f"{size:.0f}{unit}" if unit == "B" else f"{size:.1f}{unit}"

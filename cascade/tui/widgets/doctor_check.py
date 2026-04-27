@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
@@ -54,7 +54,7 @@ class FixFormModal(ModalScreen[str | None]):
     }
     """
 
-    def __init__(self, title: str, hint: str, **kwargs: object) -> None:
+    def __init__(self, title: str, hint: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._title = title
         self._hint = hint
@@ -134,11 +134,11 @@ class DoctorCheckRow(Widget):
         check_id: str,
         name: str,
         on_fix: Callable[[str, str], None] | None = None,
-        **kwargs: object,
+        **kwargs: Any,
     ) -> None:
         super().__init__(id=f"check-{check_id}", **kwargs)
         self._check_id = check_id
-        self._name = name
+        self._name: str = name
         self._on_fix = on_fix
         self._result: CheckResult | None = None
 

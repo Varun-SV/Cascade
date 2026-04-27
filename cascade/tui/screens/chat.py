@@ -26,13 +26,12 @@ if TYPE_CHECKING:
     from cascade.api import Cascade
 
 
-class ChatScreen(Screen):
+class ChatScreen(Screen[None]):
     """Full-screen interactive chat with Cascade."""
 
     DEFAULT_CSS = """
     ChatScreen {
         layout: vertical;
-        background: $bg-base;
     }
     """
 

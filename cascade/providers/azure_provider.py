@@ -49,7 +49,7 @@ class AzureProvider(OpenAIProvider):
     # the model attribute that OpenAIProvider reads.
 
     @property  # type: ignore[override]
-    def model(self) -> str:  # type: ignore[override]
+    def model(self) -> str:
         return self._azure_deployment
 
     @model.setter

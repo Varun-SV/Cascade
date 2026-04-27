@@ -7,7 +7,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 class PluginRegistry:
@@ -25,7 +25,7 @@ class PluginRegistry:
         """Load the plugin registry file."""
         if not self.registry_path.exists():
             return {"installed": []}
-        return json.loads(self.registry_path.read_text(encoding="utf-8"))
+        return cast(dict[str, Any], json.loads(self.registry_path.read_text(encoding="utf-8")))
 
     def save(self, data: dict[str, Any]) -> None:
         """Persist plugin metadata."""

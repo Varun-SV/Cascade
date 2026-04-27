@@ -86,7 +86,7 @@ class GoogleProvider(BaseProvider):
                 types.FunctionDeclaration(
                     name=t.name,
                     description=t.description,
-                    parameters=t.parameters if t.parameters else None,
+                    parameters=t.parameters if t.parameters else None,  # type: ignore[arg-type]
                 )
             )
         return [types.Tool(function_declarations=declarations)]
@@ -144,7 +144,7 @@ class GoogleProvider(BaseProvider):
         )
 
         if tools:
-            config.tools = self._format_tools(tools)
+            config.tools = self._format_tools(tools)  # type: ignore[assignment]
 
         raw = await self.client.aio.models.generate_content(
             model=self.model,
@@ -173,7 +173,7 @@ class GoogleProvider(BaseProvider):
         )
 
         if tools:
-            config.tools = self._format_tools(tools)
+            config.tools = self._format_tools(tools)  # type: ignore[assignment]
 
         async for chunk in await self.client.aio.models.generate_content_stream(
             model=self.model,
@@ -181,7 +181,7 @@ class GoogleProvider(BaseProvider):
             config=config,
         ):
             if chunk.candidates and chunk.candidates[0].content:
-                for part in chunk.candidates[0].content.parts:
+                for part in (chunk.candidates[0].content.parts or []):
                     if part.text:
                         yield StreamChunk(content=part.text)
 

@@ -7,7 +7,11 @@ import json
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from cascade.api import Cascade
+    from cascade.config import CascadeConfig
 
 import typer
 from rich.console import Console
@@ -121,7 +125,7 @@ def _apply_common_overrides(
     approval_mode: Optional[str],
     verbose: bool,
     no_auditor: bool,
-):
+) -> "CascadeConfig":
     from cascade.config import load_config
 
     cfg = load_config(config_path)
@@ -147,7 +151,7 @@ def _create_cascade(
     approval_mode: Optional[str],
     verbose: bool,
     no_auditor: bool,
-):
+) -> "Cascade":
     from cascade.api import Cascade
 
     cfg = _apply_common_overrides(

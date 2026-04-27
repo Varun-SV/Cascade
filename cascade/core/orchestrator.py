@@ -106,12 +106,12 @@ class Orchestrator:
     ) -> dict[str, Any]:
         """Handle an escalation from a lower tier."""
         prompt = ESCALATION_SYSTEM_PROMPT.format(
-            from_tier=context.from_tier,
+            from_tier=context.failed_model,
             reason=context.reason,
             task_description=context.task_description,
-            attempts=context.attempts_made,
+            attempts=context.attempts,
             errors="\n".join(context.errors) if context.errors else "None",
-            partial_result=context.partial_result or "None",
+            partial_result="None",
         )
 
         messages = [

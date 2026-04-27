@@ -5,11 +5,18 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Callable
+from typing import Callable, TypedDict, cast
 
 from cascade.providers.base import BaseProvider, Message, Role
 
-BENCHMARK_TASKS = [
+
+class BenchmarkTask(TypedDict):
+    id: str
+    prompt: str
+    keywords: list[str]
+
+
+BENCHMARK_TASKS: list[BenchmarkTask] = [
     {
         "id": "reasoning",
         "prompt": "Explain how you would safely refactor a Python function without changing behavior.",
@@ -86,4 +93,4 @@ class ModelBenchmarker:
         """Load persisted benchmark scores."""
         if not self.score_path.exists():
             return {}
-        return json.loads(self.score_path.read_text(encoding="utf-8"))
+        return cast(dict[str, dict[str, float]], json.loads(self.score_path.read_text(encoding="utf-8")))

@@ -73,13 +73,13 @@ class PendingApproval:
 class AgentBridge:
     """Runs cascade.run_stream() inside a Textual Worker and forwards events."""
 
-    def __init__(self, cascade: "Cascade", app: "App") -> None:
+    def __init__(self, cascade: "Cascade", app: "App[Any]") -> None:
         self._cascade = cascade
         self._app = app
         self._pending_approval: PendingApproval | None = None
 
         # Replace the cascade approval callback with our TUI-aware version
-        self._cascade.on_approval_request = self._tui_approval_handler  # type: ignore[attr-defined]
+        self._cascade.on_approval_request = self._tui_approval_handler
 
     async def _tui_approval_handler(
         self, request: "ApprovalRequest"
@@ -104,7 +104,7 @@ class AgentBridge:
                 self._app.post_message(AgentStreamEvent(event=event))
             # run_stream completes — fetch the last task result
             try:
-                result = await self._cascade.run_async(task)  # type: ignore[assignment]
+                result = await self._cascade.run_async(task)
             except Exception:
                 pass
         except Exception as exc:
@@ -125,5 +125,5 @@ class AgentBridge:
             self._app.post_message(AgentStreamDone(result=result, error=error))
 
 
-def make_bridge(cascade: "Cascade", app: "App") -> AgentBridge:
+def make_bridge(cascade: "Cascade", app: "App[Any]") -> AgentBridge:
     return AgentBridge(cascade=cascade, app=app)

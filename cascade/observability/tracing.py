@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from rich.console import Console
 from rich.tree import Tree
@@ -43,7 +43,7 @@ class TaskTraceWriter:
 def load_trace(task_id: str, trace_root: str) -> dict[str, Any]:
     """Load a materialized trace file."""
     trace_path = Path(trace_root) / task_id / "trace.json"
-    return json.loads(trace_path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(trace_path.read_text(encoding="utf-8")))
 
 
 def render_trace_tree(trace: dict[str, Any]) -> str:

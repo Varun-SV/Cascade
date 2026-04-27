@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from textual.app import ComposeResult
 from textual.widget import Widget
@@ -47,7 +47,7 @@ class InlineApprovalWidget(Widget):
         self,
         request: "ApprovalRequest",
         pending: "PendingApproval",
-        **kwargs: object,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._request = request
@@ -64,13 +64,9 @@ class InlineApprovalWidget(Widget):
             yield Button("Deny", variant="error", id="btn-deny")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        from cascade.core.approval import ApprovalDecision, ApprovalMode
+        from cascade.core.approval import ApprovalDecision
 
         approved = event.button.id == "btn-allow"
-        # Build a minimal ApprovalDecision
-        try:
-            decision = ApprovalDecision(approved=approved)  # type: ignore[call-arg]
-        except Exception:
-            decision = approved  # type: ignore[assignment]
-        self._pending.resolve(decision)  # type: ignore[arg-type]
+        decision = ApprovalDecision(approved=bool(approved))
+        self._pending.resolve(decision)
         self.remove()

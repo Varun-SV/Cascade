@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from textual.app import App, ComposeResult
 from textual.screen import Screen
 from textual.widget import Widget
@@ -186,7 +186,7 @@ def generate_yaml(state: WizardState) -> str:
     }
     cfg["approvals"] = {"mode": state.approval_mode}
 
-    return yaml.dump(cfg, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    return yaml.dump(cfg, default_flow_style=False, sort_keys=False, allow_unicode=True)  # type: ignore[no-any-return]
 
 
 # ── Shared wizard navigation ──────────────────────────────────────────────────
@@ -229,11 +229,10 @@ class WizardNav(Widget):
 # ── Step screens ─────────────────────────────────────────────────────────────
 
 
-class WelcomeScreen(Screen):
+class WelcomeScreen(Screen[None]):
     DEFAULT_CSS = """
     WelcomeScreen {
         align: center middle;
-        background: $bg-base;
     }
     WelcomeScreen #welcome-box {
         background: $bg-panel;
@@ -280,10 +279,9 @@ class WelcomeScreen(Screen):
             self.app.push_screen(ProviderSelectScreen(state=self.state))
 
 
-class ProviderSelectScreen(Screen):
+class ProviderSelectScreen(Screen[None]):
     DEFAULT_CSS = """
     ProviderSelectScreen {
-        background: $bg-base;
         padding: 2 4;
     }
     ProviderSelectScreen #title { color: $accent-bright; text-style: bold; margin-bottom: 1; }
@@ -403,12 +401,11 @@ class AzureEndpointForm(Widget):
         )
 
 
-class ProviderConfigScreen(Screen):
+class ProviderConfigScreen(Screen[None]):
     """Per-provider configuration. Shows a section for each selected provider."""
 
     DEFAULT_CSS = """
     ProviderConfigScreen {
-        background: $bg-base;
         padding: 2 4;
         overflow-y: auto;
     }
@@ -517,7 +514,7 @@ class ProviderConfigScreen(Screen):
             )
             add_btn = self.query_one("#add-ep-btn", Button)
             self.mount(new_form, before=add_btn)
-        elif event.button.id.startswith("rm-ep-"):
+        elif event.button.id is not None and event.button.id.startswith("rm-ep-"):
             idx = int(event.button.id.split("-")[-1])
             self._collect()
             if len(self.state.azure_endpoints) > 1:
@@ -526,10 +523,9 @@ class ProviderConfigScreen(Screen):
             form.remove()
 
 
-class PlannerSelectScreen(Screen):
+class PlannerSelectScreen(Screen[None]):
     DEFAULT_CSS = """
     PlannerSelectScreen {
-        background: $bg-base;
         padding: 2 4;
     }
     PlannerSelectScreen #title { color: $accent-bright; text-style: bold; margin-bottom: 1; }
@@ -577,10 +573,9 @@ class PlannerSelectScreen(Screen):
             self.app.pop_screen()
 
 
-class BudgetConfigScreen(Screen):
+class BudgetConfigScreen(Screen[None]):
     DEFAULT_CSS = """
     BudgetConfigScreen {
-        background: $bg-base;
         padding: 2 4;
     }
     BudgetConfigScreen #title { color: $accent-bright; text-style: bold; margin-bottom: 1; }
@@ -618,10 +613,9 @@ class BudgetConfigScreen(Screen):
             self.app.pop_screen()
 
 
-class ApprovalModeScreen(Screen):
+class ApprovalModeScreen(Screen[None]):
     DEFAULT_CSS = """
     ApprovalModeScreen {
-        background: $bg-base;
         padding: 2 4;
     }
     ApprovalModeScreen #title { color: $accent-bright; text-style: bold; margin-bottom: 1; }
@@ -660,10 +654,9 @@ class ApprovalModeScreen(Screen):
             self.app.pop_screen()
 
 
-class ConfirmScreen(Screen):
+class ConfirmScreen(Screen[None]):
     DEFAULT_CSS = """
     ConfirmScreen {
-        background: $bg-base;
         padding: 2 4;
     }
     ConfirmScreen #title { color: $accent-bright; text-style: bold; margin-bottom: 1; }
@@ -714,7 +707,7 @@ class ConfirmScreen(Screen):
 # ── Root Wizard App ───────────────────────────────────────────────────────────
 
 
-class InitWizardApp(App):
+class InitWizardApp(App[None]):
     """Multi-step cascade init wizard."""
 
     CSS_PATH = str(Path(__file__).parent.parent / "themes" / "cascade.tcss")

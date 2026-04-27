@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -33,7 +35,7 @@ class ThinkingBlock(Widget):
     }
     """
 
-    def __init__(self, text: str = "", **kwargs: object) -> None:
+    def __init__(self, text: str = "", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._text = text
 

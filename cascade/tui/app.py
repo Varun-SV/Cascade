@@ -10,7 +10,7 @@ from textual.app import App, ComposeResult
 from cascade.tui.themes import THEMES, apply_theme, load_saved_theme
 
 
-class CascadeTUIApp(App):
+class CascadeTUIApp(App[None]):
     """Full-screen Cascade TUI: chat, tools, themes."""
 
     # Load the default (cascade) theme CSS at startup
@@ -79,7 +79,7 @@ class CascadeTUIApp(App):
     def compose(self) -> ComposeResult:
         return iter([])
 
-    def action_change_theme(self, theme_name: str) -> None:
+    def action_change_theme(self, theme_name: str) -> None:  # type: ignore[override]
         apply_theme(self, theme_name)
 
     def action_clear_chat(self) -> None:
