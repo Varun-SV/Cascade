@@ -7,7 +7,7 @@ import shlex
 from pathlib import Path
 from typing import Any, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field, field_validator
 
 from cascade.core.approval import ApprovalMode
@@ -83,7 +83,7 @@ class ApprovalsConfig(BaseModel):
     def _normalize_mode(cls, value: Any) -> str:
         if value == "power_user":
             return "auto"
-        return value
+        return str(value)
 
     @field_validator("allowed_command_prefixes", mode="before")
     @classmethod
@@ -208,7 +208,7 @@ def load_config(config_path: Optional[str] = None) -> CascadeConfig:
     3. ~/.cascade/config.yaml (global)
     4. Defaults
     """
-    config_data: dict = {}
+    config_data: dict[str, Any] = {}
 
     if config_path:
         path = Path(config_path)

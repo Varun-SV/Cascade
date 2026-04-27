@@ -110,7 +110,7 @@ class BaseProvider(ABC):
         ...
 
     @abstractmethod
-    async def stream(
+    def stream(
         self,
         messages: list[Message],
         tools: list[ToolSchema] | None = None,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from textual.app import App
@@ -29,7 +29,7 @@ def load_saved_theme() -> str:
     try:
         if _STATE_FILE.exists():
             data = json.loads(_STATE_FILE.read_text())
-            name = data.get("theme", "cascade")
+            name = str(data.get("theme", "cascade"))
             if name in THEMES:
                 return name
     except Exception:
@@ -40,7 +40,7 @@ def load_saved_theme() -> str:
 def save_theme(name: str) -> None:
     try:
         _STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        data: dict = {}
+        data: dict[str, Any] = {}
         if _STATE_FILE.exists():
             data = json.loads(_STATE_FILE.read_text())
         data["theme"] = name
@@ -49,14 +49,14 @@ def save_theme(name: str) -> None:
         pass
 
 
-def apply_theme(app: "App", name: str) -> bool:
+def apply_theme(app: "App[Any]", name: str) -> bool:
     """Hot-swap the TUI theme. Returns True on success."""
     path = THEMES.get(name)
     if path is None:
         return False
     try:
         css = path.read_text()
-        app.stylesheet.source = {str(path): css}  # type: ignore[attr-defined]
+        app.stylesheet.source = {str(path): css}  # type: ignore[assignment]
         app.refresh_css()
         save_theme(name)
         return True

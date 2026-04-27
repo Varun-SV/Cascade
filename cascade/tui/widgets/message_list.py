@@ -60,7 +60,7 @@ class MessageBubble(Widget):
     }
     """
 
-    def __init__(self, role: str, text: str = "", **kwargs: object) -> None:
+    def __init__(self, role: str, text: str = "", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._role = role
         self._text = text

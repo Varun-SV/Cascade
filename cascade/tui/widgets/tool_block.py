@@ -52,7 +52,7 @@ class TerminalPanel(Widget):
     }
     """
 
-    def __init__(self, command: str = "", **kwargs: object) -> None:
+    def __init__(self, command: str = "", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._command = command
         self._full_output: list[str] = []
@@ -116,7 +116,7 @@ class ToolCallBlock(Widget):
     }
     """
 
-    def __init__(self, tool_name: str, arguments: dict[str, Any], **kwargs: object) -> None:
+    def __init__(self, tool_name: str, arguments: dict[str, Any], **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._tool_name = tool_name
         self._arguments = arguments

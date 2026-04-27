@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -72,7 +74,7 @@ class CascadeHeader(Widget):
     }
     """
 
-    def __init__(self, model_id: str = "planner", **kwargs: object) -> None:
+    def __init__(self, model_id: str = "planner", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._model_id = model_id
 

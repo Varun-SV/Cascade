@@ -27,7 +27,7 @@ from cascade.providers.base import (
     ToolResult as ProviderToolResult,
     ToolSchema,
 )
-from cascade.tools.base import ToolRegistry
+from cascade.tools.base import ToolRegistry, ToolResult as ToolExecutionResult
 
 DELEGATE_TOOL_SCHEMA = ToolSchema(
     name="delegate_task",
@@ -415,7 +415,7 @@ class CascadeAgent:
                 continue
 
             if response.usage:
-                self._invoke_cost_callback(response.usage and self.provider.get_cost(response.usage), subtask_id=subtask.id)
+                self._invoke_cost_callback(self.provider.get_cost(response.usage), subtask_id=subtask.id)
 
             if on_thinking and response.content:
                 await on_thinking(response.content)
@@ -543,7 +543,7 @@ class CascadeAgent:
                 if on_tool_call:
                     await on_tool_call(tool_call.name, tool_call.arguments)
 
-                result = await self.tool_registry.execute(
+                result: ToolExecutionResult = await self.tool_registry.execute(
                     name=tool_call.name,
                     allowed_names=self.allowed_tools,
                     approval_mode=self.config.approvals.mode,

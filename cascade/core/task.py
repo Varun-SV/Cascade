@@ -19,6 +19,12 @@ class TaskStatus(str, Enum):
     ESCALATED = "escalated"
 
 
+class TierAssignment(str, Enum):
+    """Agent tier assignment for a subtask."""
+
+    T1 = "t1"
+    T2 = "t2"
+    T3 = "t3"
 
 
 
@@ -28,6 +34,7 @@ class SubTask(BaseModel):
     id: str = ""
     description: str
     assigned_model: str = ""
+    assigned_tier: Optional[TierAssignment] = None
     assigned_tools: list[str] = Field(default_factory=list)
     status: TaskStatus = TaskStatus.PENDING
     dependencies: list[str] = Field(default_factory=list)  # IDs of prerequisite subtasks

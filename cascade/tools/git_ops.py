@@ -25,7 +25,7 @@ class GitTool(BaseTool):
     def __init__(self, project_root: str = "."):
         self.project_root = str(Path(project_root).resolve())
 
-    def _repo(self):
+    def _repo(self) -> Any:
         try:
             import git
         except ImportError as exc:

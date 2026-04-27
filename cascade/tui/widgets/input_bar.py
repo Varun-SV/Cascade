@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.message import Message
 from textual.widget import Widget
@@ -47,7 +49,7 @@ class ChatInputBar(Widget):
     }
     """
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._busy = False
 

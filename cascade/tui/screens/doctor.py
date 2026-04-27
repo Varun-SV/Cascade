@@ -131,10 +131,9 @@ def _build_checks(cfg: Any) -> list[CheckDef]:
 # ── Doctor screen ─────────────────────────────────────────────────────────────
 
 
-class DoctorScreen(Screen):
+class DoctorScreen(Screen[None]):
     DEFAULT_CSS = """
     DoctorScreen {
-        background: $bg-base;
         padding: 2 4;
     }
     DoctorScreen #title {
@@ -223,7 +222,7 @@ class DoctorScreen(Screen):
 
     def _apply_fix(self, fix_key: str, value: str, check_id: str) -> None:
         """Write the fix to config and re-run the specific check."""
-        import yaml as _yaml
+        import yaml as _yaml  # type: ignore[import-untyped]
 
         # Find and update the config file
         config_paths = [
@@ -280,7 +279,7 @@ class DoctorScreen(Screen):
 # ── Doctor App ────────────────────────────────────────────────────────────────
 
 
-class DoctorApp(App):
+class DoctorApp(App[None]):
     CSS_PATH = str(Path(__file__).parent.parent / "themes" / "cascade.tcss")
     TITLE = "Cascade Doctor"
 

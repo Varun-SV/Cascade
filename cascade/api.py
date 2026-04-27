@@ -142,9 +142,9 @@ def _build_plugin_tool(factory: Any, project_root: str) -> BaseTool:
         return factory
     if inspect.isclass(factory):
         try:
-            return factory(project_root=project_root)
+            return factory(project_root=project_root)  # type: ignore[no-any-return]
         except TypeError:
-            return factory(project_root)
+            return factory(project_root)  # type: ignore[no-any-return]
     if callable(factory):
         try:
             tool = factory(project_root=project_root)
